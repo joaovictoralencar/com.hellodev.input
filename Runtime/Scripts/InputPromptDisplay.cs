@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using TMPro;
@@ -7,17 +9,17 @@ using TMPro;
 namespace HelloDev.Input
 {
     /// <summary>
-    /// UI component that displays the current binding for an input action.
-    /// Automatically shows the correct icon/text based on the binding's device layout.
+    /// Displays the current binding for an input action with automatic icon/text switching.
+    /// Follows Unity's Input System sample pattern with added designer-friendly features.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Follows Unity's Input System sample pattern: the device layout is determined
-    /// per-binding via <c>GetBindingDisplayString()</c>, not from a global tracker.
+    /// Uses <c>bindingId</c> (GUID) to identify specific bindings, which survives binding reordering.
+    /// The editor provides a dropdown to select bindings easily.
     /// </para>
     /// <para>
-    /// This means if you have multiple bindings (keyboard + gamepad), each will
-    /// display correctly based on its own device, not a "current" device.
+    /// Supports both built-in icon display (via <see cref="InputIconProvider_SO"/>) and
+    /// custom display via <see cref="updateBindingUIEvent"/> for maximum flexibility.
     /// </para>
     /// </remarks>
     public class InputPromptDisplay : MonoBehaviour
@@ -28,48 +30,50 @@ namespace HelloDev.Input
         [Tooltip("Reference to the action to display binding for")]
         [SerializeField] private InputActionReference actionReference;
 
-        [Tooltip("Which binding to display (-1 = auto-select based on control scheme)")]
-        [SerializeField] private int bindingIndex = -1;
+        [Tooltip("ID of the specific binding to display (selected via dropdown in editor)")]
+        [SerializeField] private string bindingId;
 
-        [Tooltip("Control scheme to filter by (e.g., 'Gamepad', 'Keyboard&Mouse'). Leave empty to show first binding.")]
-        [SerializeField] private string controlSchemeFilter;
+        [Tooltip("Options for how the binding display string is formatted")]
+        [SerializeField] private InputBinding.DisplayStringOptions displayStringOptions;
 
         [Header("Icon Provider")]
-        [Tooltip("ScriptableObject that provides icon maps for different device layouts")]
+        [Tooltip("ScriptableObject that provides icon maps for different device layouts (optional)")]
         [SerializeField] private InputIconProvider_SO iconProvider;
 
         [Header("UI References")]
-        [Tooltip("Text component for displaying binding text (can be null if using icon only)")]
-        [SerializeField] private TMP_Text promptText;
+        [Tooltip("Text component for displaying binding text")]
+        [SerializeField] private TMP_Text bindingText;
 
-        [Tooltip("Image component for displaying binding icon (can be null if using text only)")]
-        [SerializeField] private Image iconImage;
+        [Tooltip("Image component for displaying binding icon")]
+        [SerializeField] private Image bindingIcon;
 
         [Header("Display Options")]
         [Tooltip("Format string for text display. {0} = binding text")]
         [SerializeField] private string textFormat = "{0}";
 
-        [Tooltip("If true, prefer showing icon over text when both are available")]
+        [Tooltip("If true, prefer showing icon over text when available")]
         [SerializeField] private bool preferIcon = true;
 
         [Tooltip("If true, hide icon when showing text and vice versa")]
         [SerializeField] private bool exclusiveDisplay = true;
 
-        [Tooltip("Options for how the binding display string is formatted")]
-        [SerializeField] private InputBinding.DisplayStringOptions displayStringOptions;
+        [Header("Events")]
+        [Tooltip("Event fired when binding display updates. Use for custom icon handling.")]
+        [SerializeField] private UpdateBindingUIEvent updateBindingUIEvent;
 
         #endregion
 
-        #region Private Fields
+        #region Static Fields
 
-        private InputAction _directAction;
+        // Static list optimization (Unity's pattern) - single subscription for all instances
+        private static List<InputPromptDisplay> s_Instances;
 
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// The action reference being displayed.
+        /// Reference to the action being displayed.
         /// </summary>
         public InputActionReference ActionReference
         {
@@ -77,30 +81,78 @@ namespace HelloDev.Input
             set
             {
                 actionReference = value;
-                UpdateDisplay();
+                UpdateBindingDisplay();
             }
         }
 
         /// <summary>
-        /// The text format used for display.
+        /// ID of the binding being displayed.
         /// </summary>
-        public string TextFormat
+        public string BindingId
         {
-            get => textFormat;
+            get => bindingId;
             set
             {
-                textFormat = value;
-                UpdateDisplay();
+                bindingId = value;
+                UpdateBindingDisplay();
             }
         }
 
         /// <summary>
-        /// Gets the resolved action (either from direct assignment or action reference).
+        /// The text component showing the binding.
         /// </summary>
-        private InputAction ResolvedAction => _directAction ?? actionReference?.action;
+        public TMP_Text BindingText
+        {
+            get => bindingText;
+            set
+            {
+                bindingText = value;
+                UpdateBindingDisplay();
+            }
+        }
 
         /// <summary>
-        /// Gets or sets whether to prefer icon over text.
+        /// The image component showing the binding icon.
+        /// </summary>
+        public Image BindingIcon
+        {
+            get => bindingIcon;
+            set
+            {
+                bindingIcon = value;
+                UpdateBindingDisplay();
+            }
+        }
+
+        /// <summary>
+        /// Display string options.
+        /// </summary>
+        public InputBinding.DisplayStringOptions DisplayStringOptions
+        {
+            get => displayStringOptions;
+            set
+            {
+                displayStringOptions = value;
+                UpdateBindingDisplay();
+            }
+        }
+
+        /// <summary>
+        /// Event fired when binding display updates.
+        /// Parameters: (component, displayString, deviceLayoutName, controlPath)
+        /// </summary>
+        public UpdateBindingUIEvent OnUpdateBindingUI
+        {
+            get
+            {
+                if (updateBindingUIEvent == null)
+                    updateBindingUIEvent = new UpdateBindingUIEvent();
+                return updateBindingUIEvent;
+            }
+        }
+
+        /// <summary>
+        /// Whether to prefer icon over text.
         /// </summary>
         public bool PreferIcon
         {
@@ -108,12 +160,12 @@ namespace HelloDev.Input
             set
             {
                 preferIcon = value;
-                UpdateDisplay();
+                UpdateBindingDisplay();
             }
         }
 
         /// <summary>
-        /// Gets or sets whether display is exclusive (icon OR text, not both).
+        /// Whether display is exclusive (icon OR text).
         /// </summary>
         public bool ExclusiveDisplay
         {
@@ -121,7 +173,7 @@ namespace HelloDev.Input
             set
             {
                 exclusiveDisplay = value;
-                UpdateDisplay();
+                UpdateBindingDisplay();
             }
         }
 
@@ -129,18 +181,29 @@ namespace HelloDev.Input
 
         #region Unity Lifecycle
 
-        private void OnEnable()
+        protected void OnEnable()
         {
-            // Subscribe to binding changes
-            InputSystem.onActionChange += OnActionChange;
+            // Static list optimization - single subscription shared by all instances
+            if (s_Instances == null)
+                s_Instances = new List<InputPromptDisplay>();
 
-            // Initial display
-            UpdateDisplay();
+            s_Instances.Add(this);
+
+            if (s_Instances.Count == 1)
+                InputSystem.onActionChange += OnActionChange;
+
+            UpdateBindingDisplay();
         }
 
-        private void OnDisable()
+        protected void OnDisable()
         {
-            InputSystem.onActionChange -= OnActionChange;
+            s_Instances.Remove(this);
+
+            if (s_Instances.Count == 0)
+            {
+                s_Instances = null;
+                InputSystem.onActionChange -= OnActionChange;
+            }
         }
 
         #endregion
@@ -148,44 +211,56 @@ namespace HelloDev.Input
         #region Display Logic
 
         /// <summary>
-        /// Refreshes the display based on current binding.
+        /// Refreshes the binding display.
         /// </summary>
-        public void UpdateDisplay()
+        public void UpdateBindingDisplay()
         {
-            var action = ResolvedAction;
-            if (action == null)
+            var displayString = string.Empty;
+            var deviceLayoutName = default(string);
+            var controlPath = default(string);
+
+            // Get display string from action
+            var action = actionReference?.action;
+            if (action != null)
             {
-                SetDisplayEmpty();
-                return;
+                var bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
+                if (bindingIndex != -1)
+                {
+                    displayString = action.GetBindingDisplayString(
+                        bindingIndex,
+                        out deviceLayoutName,
+                        out controlPath,
+                        displayStringOptions
+                    );
+                }
+                else if (action.bindings.Count > 0)
+                {
+                    // Fallback to first binding if bindingId not found
+                    displayString = action.GetBindingDisplayString(
+                        0,
+                        out deviceLayoutName,
+                        out controlPath,
+                        displayStringOptions
+                    );
+                }
             }
 
-            // Find the binding index to display
-            int resolvedBindingIndex = bindingIndex;
-            if (resolvedBindingIndex < 0)
-            {
-                resolvedBindingIndex = FindBindingForControlScheme(action, controlSchemeFilter);
-            }
+            // Update built-in display
+            UpdateBuiltInDisplay(displayString, deviceLayoutName, controlPath);
 
-            if (resolvedBindingIndex < 0 || resolvedBindingIndex >= action.bindings.Count)
-            {
-                resolvedBindingIndex = 0;
-            }
+            // Fire event for custom handling
+            updateBindingUIEvent?.Invoke(this, displayString, deviceLayoutName, controlPath);
+        }
 
-            // Get display string WITH device layout and control path (Unity's pattern)
-            var displayString = action.GetBindingDisplayString(
-                resolvedBindingIndex,
-                out var deviceLayoutName,
-                out var controlPath,
-                displayStringOptions
-            );
-
+        private void UpdateBuiltInDisplay(string displayString, string deviceLayoutName, string controlPath)
+        {
             if (string.IsNullOrEmpty(displayString))
             {
                 SetDisplayEmpty();
                 return;
             }
 
-            // Get icon from provider based on the binding's device layout
+            // Try to get icon from provider
             Sprite icon = null;
             string fallbackText = displayString;
 
@@ -213,105 +288,82 @@ namespace HelloDev.Input
             }
         }
 
-        private void OnActionChange(object obj, InputActionChange change)
-        {
-            // Only care about binding changes
-            if (change != InputActionChange.BoundControlsChanged)
-                return;
-
-            // Check if it's our action
-            var action = obj as InputAction;
-            var actionMap = action?.actionMap ?? obj as InputActionMap;
-            var actionAsset = actionMap?.asset ?? obj as InputActionAsset;
-
-            var resolvedAction = ResolvedAction;
-            if (resolvedAction == null)
-                return;
-
-            if (resolvedAction == action ||
-                resolvedAction.actionMap == actionMap ||
-                resolvedAction.actionMap?.asset == actionAsset)
-            {
-                UpdateDisplay();
-            }
-        }
-
-        private int FindBindingForControlScheme(InputAction action, string controlScheme)
-        {
-            if (string.IsNullOrEmpty(controlScheme))
-                return 0;
-
-            for (int i = 0; i < action.bindings.Count; i++)
-            {
-                var binding = action.bindings[i];
-
-                // Skip composite parts
-                if (binding.isPartOfComposite)
-                    continue;
-
-                // Check if binding matches control scheme
-                var groups = binding.groups;
-                if (!string.IsNullOrEmpty(groups))
-                {
-                    var bindingGroups = groups.Split(';');
-                    foreach (var group in bindingGroups)
-                    {
-                        if (group.Trim().Equals(controlScheme, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return i;
-                        }
-                    }
-                }
-            }
-
-            return 0;
-        }
-
         private void SetIconDisplay(Sprite icon, string altText)
         {
-            if (iconImage != null)
+            if (bindingIcon != null)
             {
-                iconImage.sprite = icon;
-                iconImage.gameObject.SetActive(true);
+                bindingIcon.sprite = icon;
+                bindingIcon.gameObject.SetActive(true);
             }
 
-            if (promptText != null)
+            if (bindingText != null)
             {
                 if (exclusiveDisplay)
                 {
-                    promptText.gameObject.SetActive(false);
+                    bindingText.gameObject.SetActive(false);
                 }
                 else
                 {
-                    promptText.text = string.Format(textFormat, altText);
+                    bindingText.text = string.Format(textFormat, altText);
+                    bindingText.gameObject.SetActive(true);
                 }
             }
         }
 
         private void SetTextDisplay(string text)
         {
-            if (promptText != null)
+            if (bindingText != null)
             {
-                promptText.text = string.Format(textFormat, text);
-                promptText.gameObject.SetActive(true);
+                bindingText.text = string.Format(textFormat, text);
+                bindingText.gameObject.SetActive(true);
             }
 
-            if (iconImage != null && exclusiveDisplay)
+            if (bindingIcon != null && exclusiveDisplay)
             {
-                iconImage.gameObject.SetActive(false);
+                bindingIcon.gameObject.SetActive(false);
             }
         }
 
         private void SetDisplayEmpty()
         {
-            if (promptText != null)
+            if (bindingText != null)
             {
-                promptText.text = string.Empty;
+                bindingText.text = string.Empty;
             }
 
-            if (iconImage != null)
+            if (bindingIcon != null)
             {
-                iconImage.gameObject.SetActive(false);
+                bindingIcon.gameObject.SetActive(false);
+            }
+        }
+
+        #endregion
+
+        #region Static Event Handler
+
+        // Static handler - updates all instances when bindings change (Unity's pattern)
+        private static void OnActionChange(object obj, InputActionChange change)
+        {
+            if (change != InputActionChange.BoundControlsChanged)
+                return;
+
+            var action = obj as InputAction;
+            var actionMap = action?.actionMap ?? obj as InputActionMap;
+            var actionAsset = actionMap?.asset ?? obj as InputActionAsset;
+
+            for (var i = 0; i < s_Instances.Count; ++i)
+            {
+                var component = s_Instances[i];
+                var referencedAction = component.actionReference?.action;
+                if (referencedAction == null)
+                    continue;
+
+                if (referencedAction == action ||
+                    referencedAction.actionMap == actionMap ||
+                    referencedAction.actionMap?.asset == actionAsset)
+                {
+                    component.UpdateBindingDisplay();
+                }
             }
         }
 
@@ -320,49 +372,12 @@ namespace HelloDev.Input
         #region Public Methods
 
         /// <summary>
-        /// Sets the action reference at runtime.
-        /// </summary>
-        public void SetAction(InputActionReference action)
-        {
-            actionReference = action;
-            UpdateDisplay();
-        }
-
-        /// <summary>
-        /// Sets an InputAction directly (for runtime-created actions).
-        /// This takes precedence over the actionReference field.
-        /// </summary>
-        public void SetAction(InputAction action)
-        {
-            _directAction = action;
-            UpdateDisplay();
-        }
-
-        /// <summary>
-        /// Clears the directly-set InputAction, reverting to using actionReference.
-        /// </summary>
-        public void ClearDirectAction()
-        {
-            _directAction = null;
-            UpdateDisplay();
-        }
-
-        /// <summary>
         /// Sets the icon provider at runtime.
         /// </summary>
         public void SetIconProvider(InputIconProvider_SO provider)
         {
             iconProvider = provider;
-            UpdateDisplay();
-        }
-
-        /// <summary>
-        /// Configures the UI references at runtime.
-        /// </summary>
-        public void ConfigureUI(TMP_Text text, Image icon)
-        {
-            promptText = text;
-            iconImage = icon;
+            UpdateBindingDisplay();
         }
 
         /// <summary>
@@ -373,19 +388,41 @@ namespace HelloDev.Input
             textFormat = format;
             preferIcon = preferIconOverText;
             exclusiveDisplay = exclusive;
+            UpdateBindingDisplay();
+        }
+
+        /// <summary>
+        /// Gets the binding index for the current bindingId.
+        /// Returns -1 if not found.
+        /// </summary>
+        public int GetBindingIndex()
+        {
+            var action = actionReference?.action;
+            if (action == null || string.IsNullOrEmpty(bindingId))
+                return -1;
+
+            return action.bindings.IndexOf(x => x.id.ToString() == bindingId);
         }
 
         #endregion
 
 #if UNITY_EDITOR
-        private void OnValidate()
+        protected void OnValidate()
         {
-            // Refresh display in editor when values change
             if (Application.isPlaying)
             {
-                UpdateDisplay();
+                UpdateBindingDisplay();
             }
         }
 #endif
+    }
+
+    /// <summary>
+    /// Event fired when binding UI should be updated.
+    /// Parameters: (component, displayString, deviceLayoutName, controlPath)
+    /// </summary>
+    [Serializable]
+    public class UpdateBindingUIEvent : UnityEvent<InputPromptDisplay, string, string, string>
+    {
     }
 }

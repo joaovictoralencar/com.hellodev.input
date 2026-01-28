@@ -1,78 +1,150 @@
-using HelloDev.UI.Default;
+using HelloDev.Logging;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using TMPro;
+using Logger = HelloDev.Logging.Logger;
 
 namespace HelloDev.Input
 {
     /// <summary>
-    /// Orchestrator that composes InputActionButton and InputPromptDisplay.
-    /// Provides a single component for buttons that respond to input and display their binding.
-    /// Respects SRP by delegating to the specialized components.
+    /// Combines InputActionButton functionality with InputPromptDisplay.
+    /// A single component for buttons that respond to input and display their binding.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is a convenience component that wires up an <see cref="InputActionButton"/>
+    /// with an <see cref="InputPromptDisplay"/>. Use it when you want a button that:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>Responds to an input action (keyboard/gamepad)</item>
+    /// <item>Displays the current binding with icons</item>
+    /// <item>Supports rebinding</item>
+    /// </list>
+    /// <para>
+    /// For more control, use <see cref="InputActionButton"/> and <see cref="InputPromptDisplay"/>
+    /// separately.
+    /// </para>
+    /// </remarks>
     [AddComponentMenu("HelloDev/Input/Input Button With Prompt")]
     public class InputButtonWithPrompt : MonoBehaviour
     {
         #region Serialized Fields
 
-        [Header("Components (auto-created if null)")]
-        [Tooltip("The InputActionButton component")]
-        [SerializeField] private InputActionButton inputActionButton;
+        [Header("Input Action")]
+        [Tooltip("The action that triggers this button and is displayed")]
+        [SerializeField] private InputActionReference actionReference;
 
-        [Tooltip("The InputPromptDisplay component")]
-        [SerializeField] private InputPromptDisplay promptDisplay;
+        [Tooltip("ID of the specific binding to display (selected via dropdown in editor)")]
+        [SerializeField] private string bindingId;
 
-        [Header("Button")]
-        [Tooltip("The UIButton to trigger when input is performed")]
-        [SerializeField] private UIButton uiButton;
+        [Header("Icon Provider")]
+        [Tooltip("ScriptableObject that provides icon maps for different device layouts")]
+        [SerializeField] private InputIconProvider_SO iconProvider;
 
-        [Header("Input Bindings")]
-        [Tooltip("Unique name for this input action")]
-        [SerializeField] private string actionName = "MyAction";
+        [Header("UI References")]
+        [Tooltip("Text component for displaying binding text")]
+        [SerializeField] private TMP_Text bindingText;
 
-        [Tooltip("Keyboard binding path (e.g., <Keyboard>/k)")]
-        [SerializeField] private string keyboardBinding = "<Keyboard>/space";
+        [Tooltip("Image component for displaying binding icon")]
+        [SerializeField] private Image bindingIcon;
 
-        [Tooltip("Gamepad binding path (e.g., <Gamepad>/buttonSouth)")]
-        [SerializeField] private string gamepadBinding = "<Gamepad>/buttonSouth";
-
-        [Header("Prompt Display")]
-        [Tooltip("Text component for displaying binding text (optional)")]
-        [SerializeField] private TMP_Text promptText;
-
-        [Tooltip("Image component for displaying binding icon (optional)")]
-        [SerializeField] private Image iconImage;
-
+        [Header("Display Options")]
         [Tooltip("Format string for text display. {0} = binding text")]
         [SerializeField] private string textFormat = "[{0}]";
 
-        [Tooltip("If true, prefer showing icon over text when both are available")]
+        [Tooltip("If true, prefer showing icon over text when available")]
         [SerializeField] private bool preferIcon = true;
 
         [Tooltip("If true, hide icon when showing text and vice versa")]
         [SerializeField] private bool exclusiveDisplay = true;
+
+        [Header("Button Options")]
+        [Tooltip("If true, only trigger when the GameObject is interactable (checks CanvasGroup)")]
+        [SerializeField] private bool respectCanvasGroup = true;
+
+        [Header("Events")]
+        [Tooltip("Invoked when the action is performed")]
+        [SerializeField] private UnityEvent onActionPerformed = new();
+
+        [Tooltip("Event fired when binding display updates. Use for custom icon handling.")]
+        [SerializeField] private UpdateBindingUIEvent updateBindingUIEvent;
 
         [Header("Debug")]
         [SerializeField] private bool enableDebugLogging;
 
         #endregion
 
+        #region Private Fields
+
+        private CanvasGroup _canvasGroup;
+        private static System.Collections.Generic.List<InputButtonWithPrompt> s_Instances;
+
+        #endregion
+
         #region Properties
 
         /// <summary>
-        /// Gets the InputActionButton component.
+        /// The action reference.
         /// </summary>
-        public InputActionButton ActionButton => inputActionButton;
+        public InputActionReference ActionReference
+        {
+            get => actionReference;
+            set
+            {
+                // Unsubscribe from old action
+                if (enabled && actionReference?.action != null)
+                {
+                    actionReference.action.performed -= HandleActionPerformed;
+                }
+
+                actionReference = value;
+
+                // Subscribe to new action
+                if (enabled && actionReference?.action != null)
+                {
+                    actionReference.action.performed += HandleActionPerformed;
+                }
+
+                UpdateBindingDisplay();
+            }
+        }
 
         /// <summary>
-        /// Gets the InputPromptDisplay component.
+        /// ID of the binding being displayed.
         /// </summary>
-        public InputPromptDisplay PromptDisplay => promptDisplay;
+        public string BindingId
+        {
+            get => bindingId;
+            set
+            {
+                bindingId = value;
+                UpdateBindingDisplay();
+            }
+        }
 
         /// <summary>
-        /// Gets the action name.
+        /// Event invoked when the action is performed.
         /// </summary>
-        public string ActionName => actionName;
+        public UnityEvent OnActionPerformed => onActionPerformed;
+
+        /// <summary>
+        /// Whether this button is currently interactable.
+        /// </summary>
+        public bool IsInteractable
+        {
+            get
+            {
+                if (!respectCanvasGroup)
+                    return true;
+
+                if (_canvasGroup == null)
+                    _canvasGroup = GetComponentInParent<CanvasGroup>();
+
+                return _canvasGroup == null || _canvasGroup.interactable;
+            }
+        }
 
         #endregion
 
@@ -80,96 +152,298 @@ namespace HelloDev.Input
 
         private void Awake()
         {
-            EnsureComponents();
+            if (respectCanvasGroup)
+            {
+                _canvasGroup = GetComponentInParent<CanvasGroup>();
+            }
         }
 
         private void OnEnable()
         {
-            ConfigureComponents();
+            // Subscribe to action
+            if (actionReference?.action != null)
+            {
+                actionReference.action.performed += HandleActionPerformed;
+            }
+
+            // Static list for binding change notifications
+            if (s_Instances == null)
+                s_Instances = new System.Collections.Generic.List<InputButtonWithPrompt>();
+
+            s_Instances.Add(this);
+
+            if (s_Instances.Count == 1)
+                InputSystem.onActionChange += OnActionChange;
+
+            UpdateBindingDisplay();
+        }
+
+        private void OnDisable()
+        {
+            // Unsubscribe from action
+            if (actionReference?.action != null)
+            {
+                actionReference.action.performed -= HandleActionPerformed;
+            }
+
+            // Remove from static list
+            s_Instances.Remove(this);
+
+            if (s_Instances.Count == 0)
+            {
+                s_Instances = null;
+                InputSystem.onActionChange -= OnActionChange;
+            }
         }
 
         #endregion
 
-        #region Component Management
+        #region Action Handling
 
-        private void EnsureComponents()
+        private void HandleActionPerformed(InputAction.CallbackContext context)
         {
-            // Get or create InputActionButton
-            if (inputActionButton == null)
+            if (!IsInteractable)
             {
-                inputActionButton = GetComponent<InputActionButton>();
-                if (inputActionButton == null)
+                if (enableDebugLogging)
                 {
-                    inputActionButton = gameObject.AddComponent<InputActionButton>();
-                    if (enableDebugLogging)
-                    {
-                        Debug.Log("[InputButtonWithPrompt] Created InputActionButton component", this);
-                    }
+                    Logger.LogVerbose(LogSystems.Input, "Action ignored (not interactable)");
+                }
+                return;
+            }
+
+            if (enableDebugLogging)
+            {
+                Logger.Log(LogSystems.Input, "Action performed");
+            }
+
+            onActionPerformed?.Invoke();
+        }
+
+        #endregion
+
+        #region Display Logic
+
+        /// <summary>
+        /// Refreshes the binding display.
+        /// </summary>
+        public void UpdateBindingDisplay()
+        {
+            var displayString = string.Empty;
+            var deviceLayoutName = default(string);
+            var controlPath = default(string);
+
+            var action = actionReference?.action;
+            if (action != null)
+            {
+                var bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
+                if (bindingIndex != -1)
+                {
+                    displayString = action.GetBindingDisplayString(
+                        bindingIndex,
+                        out deviceLayoutName,
+                        out controlPath,
+                        InputBinding.DisplayStringOptions.DontUseShortDisplayNames
+                    );
+                }
+                else if (action.bindings.Count > 0)
+                {
+                    displayString = action.GetBindingDisplayString(
+                        0,
+                        out deviceLayoutName,
+                        out controlPath,
+                        InputBinding.DisplayStringOptions.DontUseShortDisplayNames
+                    );
                 }
             }
 
-            // Get or create InputPromptDisplay only if we have UI elements
-            bool hasPromptUI = promptText != null || iconImage != null;
-            if (promptDisplay == null && hasPromptUI)
+            UpdateBuiltInDisplay(displayString, deviceLayoutName, controlPath);
+            updateBindingUIEvent?.Invoke(null, displayString, deviceLayoutName, controlPath);
+        }
+
+        private void UpdateBuiltInDisplay(string displayString, string deviceLayoutName, string controlPath)
+        {
+            if (string.IsNullOrEmpty(displayString))
             {
-                promptDisplay = GetComponent<InputPromptDisplay>();
-                if (promptDisplay == null)
+                SetDisplayEmpty();
+                return;
+            }
+
+            Sprite icon = null;
+            string fallbackText = displayString;
+
+            if (iconProvider != null && !string.IsNullOrEmpty(controlPath))
+            {
+                var (mappedIcon, mappedText) = iconProvider.GetBinding(deviceLayoutName, controlPath);
+                if (mappedIcon != null)
                 {
-                    promptDisplay = gameObject.AddComponent<InputPromptDisplay>();
-                    if (enableDebugLogging)
-                    {
-                        Debug.Log("[InputButtonWithPrompt] Created InputPromptDisplay component", this);
-                    }
+                    icon = mappedIcon;
+                }
+                if (!string.IsNullOrEmpty(mappedText))
+                {
+                    fallbackText = mappedText;
+                }
+            }
+
+            if (preferIcon && icon != null)
+            {
+                SetIconDisplay(icon, fallbackText);
+            }
+            else
+            {
+                SetTextDisplay(fallbackText);
+            }
+        }
+
+        private void SetIconDisplay(Sprite icon, string altText)
+        {
+            if (bindingIcon != null)
+            {
+                bindingIcon.sprite = icon;
+                bindingIcon.gameObject.SetActive(true);
+            }
+
+            if (bindingText != null)
+            {
+                if (exclusiveDisplay)
+                {
+                    bindingText.gameObject.SetActive(false);
+                }
+                else
+                {
+                    bindingText.text = string.Format(textFormat, altText);
+                    bindingText.gameObject.SetActive(true);
                 }
             }
         }
 
-        private void ConfigureComponents()
+        private void SetTextDisplay(string text)
         {
-            // Configure InputActionButton
-            if (inputActionButton != null)
+            if (bindingText != null)
             {
-                inputActionButton.Configure(actionName, keyboardBinding, gamepadBinding);
-                inputActionButton.SetButton(uiButton);
-
-                // Wire up prompt display
-                if (promptDisplay != null)
-                {
-                    inputActionButton.SetPromptDisplay(promptDisplay);
-                }
+                bindingText.text = string.Format(textFormat, text);
+                bindingText.gameObject.SetActive(true);
             }
 
-            // Configure InputPromptDisplay
-            if (promptDisplay != null)
+            if (bindingIcon != null && exclusiveDisplay)
             {
-                promptDisplay.ConfigureUI(promptText, iconImage);
-                promptDisplay.ConfigureDisplayOptions(textFormat, preferIcon, exclusiveDisplay);
+                bindingIcon.gameObject.SetActive(false);
+            }
+        }
+
+        private void SetDisplayEmpty()
+        {
+            if (bindingText != null)
+            {
+                bindingText.text = string.Empty;
+            }
+
+            if (bindingIcon != null)
+            {
+                bindingIcon.gameObject.SetActive(false);
+            }
+        }
+
+        #endregion
+
+        #region Static Event Handler
+
+        private static void OnActionChange(object obj, InputActionChange change)
+        {
+            if (change != InputActionChange.BoundControlsChanged)
+                return;
+
+            var action = obj as InputAction;
+            var actionMap = action?.actionMap ?? obj as InputActionMap;
+            var actionAsset = actionMap?.asset ?? obj as InputActionAsset;
+
+            for (var i = 0; i < s_Instances.Count; ++i)
+            {
+                var component = s_Instances[i];
+                var referencedAction = component.actionReference?.action;
+                if (referencedAction == null)
+                    continue;
+
+                if (referencedAction == action ||
+                    referencedAction.actionMap == actionMap ||
+                    referencedAction.actionMap?.asset == actionAsset)
+                {
+                    component.UpdateBindingDisplay();
+                }
             }
         }
 
         #endregion
 
         #region Public Methods
-        
 
         /// <summary>
-        /// Sets the UIButton at runtime.
+        /// Manually triggers the action performed event.
         /// </summary>
-        public void SetButton(UIButton button)
+        public void TriggerAction()
         {
-            uiButton = button;
-            inputActionButton?.SetButton(button);
+            if (!IsInteractable)
+                return;
+
+            onActionPerformed?.Invoke();
         }
 
         /// <summary>
-        /// Updates the input bindings at runtime.
-        /// Note: Changes take effect on next enable cycle.
+        /// Sets the icon provider at runtime.
         /// </summary>
-        public void SetBindings(string keyboard, string gamepad)
+        public void SetIconProvider(InputIconProvider_SO provider)
         {
-            keyboardBinding = keyboard;
-            gamepadBinding = gamepad;
-            inputActionButton?.Configure(actionName, keyboardBinding, gamepadBinding);
+            iconProvider = provider;
+            UpdateBindingDisplay();
+        }
+
+        /// <summary>
+        /// Starts an interactive rebind for this action.
+        /// </summary>
+        /// <param name="bindingIndex">The binding index to rebind (-1 for auto)</param>
+        public void StartRebind(int bindingIndex = -1)
+        {
+            var manager = InputRebindManager.Instance;
+            if (manager == null)
+            {
+                Logger.LogWarning(LogSystems.Input, "Cannot rebind: InputRebindManager not found");
+                return;
+            }
+
+            if (bindingIndex < 0 && !string.IsNullOrEmpty(bindingId))
+            {
+                var action = actionReference?.action;
+                if (action != null)
+                {
+                    bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
+                }
+            }
+
+            manager.StartRebind(actionReference, bindingIndex);
+        }
+
+        /// <summary>
+        /// Resets this action's bindings to default.
+        /// </summary>
+        public void ResetBinding()
+        {
+            var manager = InputRebindManager.Instance;
+            if (manager == null)
+            {
+                Logger.LogWarning(LogSystems.Input, "Cannot reset: InputRebindManager not found");
+                return;
+            }
+
+            var bindingIndex = -1;
+            if (!string.IsNullOrEmpty(bindingId))
+            {
+                var action = actionReference?.action;
+                if (action != null)
+                {
+                    bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
+                }
+            }
+
+            manager.ResetBinding(actionReference, bindingIndex);
         }
 
         #endregion
@@ -177,36 +451,16 @@ namespace HelloDev.Input
 #if UNITY_EDITOR
         private void Reset()
         {
-            // Auto-find UIButton on same GameObject
-            if (uiButton == null)
-            {
-                uiButton = GetComponent<UIButton>();
-            }
-
-            // Auto-find prompt text in children
-            if (promptText == null)
-            {
-                promptText = GetComponentInChildren<TMP_Text>();
-            }
-
-            // Auto-find existing components
-            if (inputActionButton == null)
-            {
-                inputActionButton = GetComponent<InputActionButton>();
-            }
-
-            if (promptDisplay == null)
-            {
-                promptDisplay = GetComponent<InputPromptDisplay>();
-            }
+            _canvasGroup = GetComponentInParent<CanvasGroup>();
+            bindingText = GetComponentInChildren<TMP_Text>();
+            bindingIcon = GetComponentInChildren<Image>();
         }
 
         private void OnValidate()
         {
-            // Generate unique action name if using default
-            if (actionName == "MyAction" && !string.IsNullOrEmpty(gameObject.name))
+            if (Application.isPlaying)
             {
-                actionName = $"{gameObject.name}_Action";
+                UpdateBindingDisplay();
             }
         }
 #endif

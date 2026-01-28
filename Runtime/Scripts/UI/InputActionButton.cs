@@ -1,35 +1,39 @@
-using HelloDev.UI.Default;
+using HelloDev.Logging;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using Logger = HelloDev.Logging.Logger;
 
 namespace HelloDev.Input
 {
     /// <summary>
-    /// Adds input action support to a button.
-    /// When the configured input is pressed, triggers the button click.
-    /// Creates runtime action on enable, disposes on disable.
+    /// Triggers a UnityEvent when an input action is performed.
+    /// Uses InputActionReference for rebinding compatibility.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This component listens to an <see cref="InputActionReference"/> and invokes
+    /// <see cref="OnActionPerformed"/> when the action is triggered. It works with
+    /// the rebinding system - if bindings change, the component automatically responds
+    /// to the new bindings.
+    /// </para>
+    /// </remarks>
+    [AddComponentMenu("HelloDev/Input/Input Action Button")]
     public class InputActionButton : MonoBehaviour
     {
         #region Serialized Fields
 
-        [Header("Button Reference")]
-        [Tooltip("HelloDev UIButton to trigger (uses UIButton)")]
-        [SerializeField] private UIButton uiButton;
+        [Header("Input Action")]
+        [Tooltip("Reference to the action that triggers this button")]
+        [SerializeField] private InputActionReference actionReference;
 
-        [Header("Input Bindings")]
-        [Tooltip("Unique name for this input action")]
-        [SerializeField] private string actionName = "MyAction";
+        [Header("Events")]
+        [Tooltip("Invoked when the action is performed")]
+        [SerializeField] private UnityEvent onActionPerformed = new();
 
-        [Tooltip("Keyboard binding path (e.g., <Keyboard>/space)")]
-        [SerializeField] private string keyboardBinding = "<Keyboard>/space";
-
-        [Tooltip("Gamepad binding path (e.g., <Gamepad>/buttonSouth)")]
-        [SerializeField] private string gamepadBinding = "<Gamepad>/buttonSouth";
-
-        [Header("Prompt Display (Optional)")]
-        [Tooltip("Optional InputPromptDisplay to show binding icon/text")]
-        [SerializeField] private InputPromptDisplay promptDisplay;
+        [Header("Options")]
+        [Tooltip("If true, only trigger when the GameObject is interactable (checks CanvasGroup)")]
+        [SerializeField] private bool respectCanvasGroup = true;
 
         [Header("Debug")]
         [SerializeField] private bool enableDebugLogging;
@@ -38,112 +42,117 @@ namespace HelloDev.Input
 
         #region Private Fields
 
-        private InputAction _action;
+        private CanvasGroup _canvasGroup;
 
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// Gets the unique action name for this button.
+        /// The action reference this button responds to.
         /// </summary>
-        public string ActionName => actionName;
+        public InputActionReference ActionReference
+        {
+            get => actionReference;
+            set
+            {
+                // Unsubscribe from old action
+                if (enabled && actionReference?.action != null)
+                {
+                    actionReference.action.performed -= HandleActionPerformed;
+                }
+
+                actionReference = value;
+
+                // Subscribe to new action
+                if (enabled && actionReference?.action != null)
+                {
+                    actionReference.action.performed += HandleActionPerformed;
+                }
+            }
+        }
 
         /// <summary>
-        /// Gets the runtime InputAction (null when disabled).
+        /// Event invoked when the action is performed.
         /// </summary>
-        public InputAction Action => _action;
+        public UnityEvent OnActionPerformed => onActionPerformed;
+
+        /// <summary>
+        /// Whether this button is currently interactable.
+        /// </summary>
+        public bool IsInteractable
+        {
+            get
+            {
+                if (!respectCanvasGroup)
+                    return true;
+
+                if (_canvasGroup == null)
+                    _canvasGroup = GetComponentInParent<CanvasGroup>();
+
+                return _canvasGroup == null || _canvasGroup.interactable;
+            }
+        }
 
         #endregion
 
         #region Unity Lifecycle
 
+        private void Awake()
+        {
+            if (respectCanvasGroup)
+            {
+                _canvasGroup = GetComponentInParent<CanvasGroup>();
+            }
+        }
+
         private void OnEnable()
         {
-            InitializeAction();
+            if (actionReference?.action != null)
+            {
+                actionReference.action.performed += HandleActionPerformed;
+
+                if (enableDebugLogging)
+                {
+                    Logger.Log(LogSystems.Input, $"Subscribed to action '{actionReference.action.name}'");
+                }
+            }
         }
 
         private void OnDisable()
         {
-            DisposeAction();
+            if (actionReference?.action != null)
+            {
+                actionReference.action.performed -= HandleActionPerformed;
+
+                if (enableDebugLogging)
+                {
+                    Logger.Log(LogSystems.Input, $"Unsubscribed from action '{actionReference.action.name}'");
+                }
+            }
         }
 
         #endregion
 
-        #region Input Action Management
+        #region Event Handling
 
-        private void InitializeAction()
+        private void HandleActionPerformed(InputAction.CallbackContext context)
         {
-            var manager = InputRebindManager.Instance;
-            if (manager == null)
+            if (!IsInteractable)
             {
                 if (enableDebugLogging)
                 {
-                    Debug.LogWarning($"[InputActionButton] InputRebindManager not found, input action '{actionName}' will not work", this);
+                    Logger.Log(LogSystems.Input, $" Action '{actionReference.action.name}' ignored (not interactable)", this);
                 }
                 return;
             }
 
-            // Create runtime action with both bindings
-            _action = manager.CreateRuntimeAction(actionName, keyboardBinding, gamepadBinding);
-
-            if (_action != null)
+            if (enableDebugLogging)
             {
-                _action.performed += OnActionPerformed;
-
-                // Update prompt display if assigned
-                if (promptDisplay != null)
-                {
-                    promptDisplay.SetAction(_action);
-                }
-
-                if (enableDebugLogging)
-                {
-                    Debug.Log($"[InputActionButton] Action '{actionName}' initialized", this);
-                }
-            }
-        }
-
-        private void DisposeAction()
-        {
-            // Unsubscribe from action
-            if (_action != null)
-            {
-                _action.performed -= OnActionPerformed;
-                _action = null;
+                Logger.Log(LogSystems.Input, $" Action '{actionReference.action.name}' performed", this);
             }
 
-            // Clear prompt display
-            if (promptDisplay != null)
-            {
-                promptDisplay.ClearDirectAction();
-            }
-
-            // Dispose action from manager
-            var manager = InputRebindManager.Instance;
-            if (manager != null)
-            {
-                manager.DisposeRuntimeAction(actionName);
-
-                if (enableDebugLogging)
-                {
-                    Debug.Log($"[InputActionButton] Action '{actionName}' disposed", this);
-                }
-            }
-        }
-
-        private void OnActionPerformed(InputAction.CallbackContext context)
-        {
-            // Trigger UIButton
-            if (uiButton != null && uiButton.IsInteractable)
-            {
-                if (enableDebugLogging)
-                {
-                    Debug.Log($"[InputActionButton] Action '{actionName}' triggered UIButton click", this);
-                }
-
-                uiButton.OnClick?.Invoke();
-            }
+            onActionPerformed?.Invoke();
         }
 
         #endregion
@@ -151,67 +160,84 @@ namespace HelloDev.Input
         #region Public Methods
 
         /// <summary>
-        /// Configures the input bindings at runtime.
-        /// Must be called before OnEnable or while disabled.
+        /// Manually triggers the action performed event.
         /// </summary>
-        public void Configure(string name, string keyboard, string gamepad)
+        public void TriggerAction()
         {
-            actionName = name;
-            keyboardBinding = keyboard;
-            gamepadBinding = gamepad;
+            if (!IsInteractable)
+                return;
+
+            onActionPerformed?.Invoke();
         }
 
         /// <summary>
-        /// Sets the UIButton reference at runtime.
+        /// Gets the binding index for a specific control scheme.
         /// </summary>
-        public void SetButton(UIButton button)
+        /// <param name="controlScheme">The control scheme name (e.g., "Gamepad", "Keyboard&Mouse")</param>
+        /// <returns>The binding index, or -1 if not found</returns>
+        public int GetBindingIndexForScheme(string controlScheme)
         {
-            uiButton = button;
-        }
+            var action = actionReference?.action;
+            if (action == null || string.IsNullOrEmpty(controlScheme))
+                return -1;
 
-        /// <summary>
-        /// Sets the prompt display reference at runtime.
-        /// </summary>
-        public void SetPromptDisplay(InputPromptDisplay display)
-        {
-            promptDisplay = display;
-
-            // Update display with current action if we have one
-            if (_action != null && promptDisplay != null)
+            for (int i = 0; i < action.bindings.Count; i++)
             {
-                promptDisplay.SetAction(_action);
+                var binding = action.bindings[i];
+                if (binding.isPartOfComposite)
+                    continue;
+
+                if (!string.IsNullOrEmpty(binding.groups) &&
+                    binding.groups.Contains(controlScheme))
+                {
+                    return i;
+                }
             }
+
+            return -1;
         }
 
         /// <summary>
-        /// Gets the keyboard binding path.
+        /// Starts an interactive rebind for this action.
+        /// Requires InputRebindManager in scene.
         /// </summary>
-        public string KeyboardBinding => keyboardBinding;
+        /// <param name="bindingIndex">The binding index to rebind (-1 for first non-composite)</param>
+        public void StartRebind(int bindingIndex = -1)
+        {
+            var manager = InputRebindManager.Instance;
+            if (manager == null)
+            {
+                Logger.LogWarning(LogSystems.Input, "Cannot rebind: InputRebindManager not found");
+                return;
+            }
+
+            manager.StartRebind(actionReference, bindingIndex);
+        }
 
         /// <summary>
-        /// Gets the gamepad binding path.
+        /// Resets this action's bindings to default.
+        /// Requires InputRebindManager in scene.
         /// </summary>
-        public string GamepadBinding => gamepadBinding;
+        /// <param name="bindingIndex">The binding index to reset (-1 for all bindings)</param>
+        public void ResetBinding(int bindingIndex = -1)
+        {
+            var manager = InputRebindManager.Instance;
+            if (manager == null)
+            {
+                Logger.LogWarning(LogSystems.Input, "Cannot reset: InputRebindManager not found");
+                return;
+            }
+
+            manager.ResetBinding(actionReference, bindingIndex);
+        }
 
         #endregion
 
 #if UNITY_EDITOR
         private void Reset()
         {
-            // Auto-find UIButton on same GameObject
-            if (uiButton == null)
-            {
-                uiButton = GetComponent<UIButton>();
-            }
-        }
-
-        private void OnValidate()
-        {
-            // Generate unique action name if using default
-            if (actionName == "MyAction" && !string.IsNullOrEmpty(gameObject.name))
-            {
-                actionName = $"{gameObject.name}_Action";
-            }
+            // Auto-find CanvasGroup
+            _canvasGroup = GetComponentInParent<CanvasGroup>();
         }
 #endif
     }
