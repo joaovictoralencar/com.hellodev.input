@@ -1,0 +1,118 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0bf646f1a499a6469fb41169e1d75ec, type: 3}
+  m_Name: KeyboardIconMap
+  m_EditorClassIdentifier:
+  deviceLayoutName: Keyboard
+  mappings:
+  - controlPath: k
+    icon: {fileID: 0}
+    fallbackText: K
+  - controlPath: backspace
+    icon: {fileID: 0}
+    fallbackText: Backspace
+  - controlPath: space
+    icon: {fileID: 0}
+    fallbackText: Space
+  - controlPath: enter
+    icon: {fileID: 0}
+    fallbackText: Enter
+  - controlPath: escape
+    icon: {fileID: 0}
+    fallbackText: Esc
+  - controlPath: tab
+    icon: {fileID: 0}
+    fallbackText: Tab
+  - controlPath: leftShift
+    icon: {fileID: 0}
+    fallbackText: Shift
+  - controlPath: leftCtrl
+    icon: {fileID: 0}
+    fallbackText: Ctrl
+  - controlPath: leftAlt
+    icon: {fileID: 0}
+    fallbackText: Alt
+  - controlPath: a
+    icon: {fileID: 0}
+    fallbackText: A
+  - controlPath: b
+    icon: {fileID: 0}
+    fallbackText: B
+  - controlPath: c
+    icon: {fileID: 0}
+    fallbackText: C
+  - controlPath: d
+    icon: {fileID: 0}
+    fallbackText: D
+  - controlPath: e
+    icon: {fileID: 0}
+    fallbackText: E
+  - controlPath: f
+    icon: {fileID: 0}
+    fallbackText: F
+  - controlPath: g
+    icon: {fileID: 0}
+    fallbackText: G
+  - controlPath: h
+    icon: {fileID: 0}
+    fallbackText: H
+  - controlPath: i
+    icon: {fileID: 0}
+    fallbackText: I
+  - controlPath: j
+    icon: {fileID: 0}
+    fallbackText: J
+  - controlPath: l
+    icon: {fileID: 0}
+    fallbackText: L
+  - controlPath: m
+    icon: {fileID: 0}
+    fallbackText: M
+  - controlPath: n
+    icon: {fileID: 0}
+    fallbackText: N
+  - controlPath: o
+    icon: {fileID: 0}
+    fallbackText: O
+  - controlPath: p
+    icon: {fileID: 0}
+    fallbackText: P
+  - controlPath: q
+    icon: {fileID: 0}
+    fallbackText: Q
+  - controlPath: r
+    icon: {fileID: 0}
+    fallbackText: R
+  - controlPath: s
+    icon: {fileID: 0}
+    fallbackText: S
+  - controlPath: t
+    icon: {fileID: 0}
+    fallbackText: T
+  - controlPath: u
+    icon: {fileID: 0}
+    fallbackText: U
+  - controlPath: v
+    icon: {fileID: 0}
+    fallbackText: V
+  - controlPath: w
+    icon: {fileID: 0}
+    fallbackText: W
+  - controlPath: x
+    icon: {fileID: 0}
+    fallbackText: X
+  - controlPath: y
+    icon: {fileID: 0}
+    fallbackText: Y
+  - controlPath: z
+    icon: {fileID: 0}
+    fallbackText: Z

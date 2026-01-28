@@ -1,0 +1,21 @@
+{
+  "name": "com.hellodev.input",
+  "version": "1.0.0",
+  "displayName": "HelloDev Input",
+  "description": "Input display, device tracking, and rebinding utilities for Unity Input System",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.unity.inputsystem": "1.7.0",
+    "com.unity.textmeshpro": "3.0.6"
+  },
+  "keywords": [
+    "input",
+    "rebinding",
+    "gamepad",
+    "keyboard",
+    "icons"
+  ],
+  "author": {
+    "name": "HelloDev"
+  }
+}
