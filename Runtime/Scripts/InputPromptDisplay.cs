@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -11,6 +12,7 @@ namespace HelloDev.Input
     /// <summary>
     /// Displays the current binding for an input action with automatic icon/text switching.
     /// Follows Unity's Input System sample pattern with added designer-friendly features.
+    /// Automatically updates when the player switches input devices.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -20,6 +22,10 @@ namespace HelloDev.Input
     /// <para>
     /// Supports both built-in icon display (via <see cref="InputIconProvider_SO"/>) and
     /// custom display via <see cref="updateBindingUIEvent"/> for maximum flexibility.
+    /// </para>
+    /// <para>
+    /// <b>Device Tracking:</b> If <see cref="LastUsedDeviceTracker"/> is present in the scene,
+    /// this component automatically updates when the player switches between keyboard, mouse, and gamepad.
     /// </para>
     /// </remarks>
     public class InputPromptDisplay : MonoBehaviour
@@ -55,7 +61,7 @@ namespace HelloDev.Input
         [SerializeField] private bool preferIcon = true;
 
         [Tooltip("If true, hide icon when showing text and vice versa")]
-        [SerializeField] private bool exclusiveDisplay = true;
+        [SerializeField] private bool exclusiveDisplay;
 
         [Header("Events")]
         [Tooltip("Event fired when binding display updates. Use for custom icon handling.")]
@@ -70,6 +76,14 @@ namespace HelloDev.Input
 
         #endregion
 
+        #region Private Fields
+
+        private bool _subscribedToDeviceTracker;
+        private string _cachedActionId;
+        private int _cachedBindingIndex = -1;
+
+        #endregion
+
         #region Properties
 
         /// <summary>
@@ -81,6 +95,7 @@ namespace HelloDev.Input
             set
             {
                 actionReference = value;
+                InvalidateCache();
                 UpdateBindingDisplay();
             }
         }
@@ -94,6 +109,7 @@ namespace HelloDev.Input
             set
             {
                 bindingId = value;
+                InvalidateCache();
                 UpdateBindingDisplay();
             }
         }
@@ -192,6 +208,9 @@ namespace HelloDev.Input
             if (s_Instances.Count == 1)
                 InputSystem.onActionChange += OnActionChange;
 
+            // Subscribe to device tracker for real-time device switching
+            SubscribeToDeviceTracker();
+
             UpdateBindingDisplay();
         }
 
@@ -204,6 +223,49 @@ namespace HelloDev.Input
                 s_Instances = null;
                 InputSystem.onActionChange -= OnActionChange;
             }
+
+            // Unsubscribe from device tracker
+            UnsubscribeFromDeviceTracker();
+        }
+
+        #endregion
+
+        #region Device Tracking (Options B + C)
+
+        private void SubscribeToDeviceTracker()
+        {
+            if (_subscribedToDeviceTracker)
+                return;
+
+            var tracker = LastUsedDeviceTracker.Instance;
+            if (tracker != null)
+            {
+                tracker.DeviceChanged += OnDeviceChanged;
+                _subscribedToDeviceTracker = true;
+            }
+        }
+
+        private void UnsubscribeFromDeviceTracker()
+        {
+            if (!_subscribedToDeviceTracker)
+                return;
+
+            var tracker = LastUsedDeviceTracker.Instance;
+            if (tracker != null)
+            {
+                tracker.DeviceChanged -= OnDeviceChanged;
+            }
+
+            _subscribedToDeviceTracker = false;
+        }
+
+        /// <summary>
+        /// Called when the active input device changes.
+        /// Refreshes the binding display - Unity automatically resolves the correct binding.
+        /// </summary>
+        private void OnDeviceChanged(InputDevice previousDevice, InputDevice newDevice)
+        {
+            UpdateBindingDisplay();
         }
 
         #endregion
@@ -212,6 +274,7 @@ namespace HelloDev.Input
 
         /// <summary>
         /// Refreshes the binding display.
+        /// Unity's Input System automatically resolves which binding to use based on the current device.
         /// </summary>
         public void UpdateBindingDisplay()
         {
@@ -219,13 +282,22 @@ namespace HelloDev.Input
             var deviceLayoutName = default(string);
             var controlPath = default(string);
 
-            // Get display string from action
             var action = actionReference?.action;
             if (action != null)
             {
-                var bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
+                // Use cached binding index if action hasn't changed (performance optimization)
+                var currentActionId = action.id.ToString();
+                if (_cachedActionId != currentActionId || _cachedBindingIndex == -1)
+                {
+                    _cachedBindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
+                    _cachedActionId = currentActionId;
+                }
+
+                var bindingIndex = _cachedBindingIndex;
+
                 if (bindingIndex != -1)
                 {
+                    // Unity automatically resolves to the correct device binding
                     displayString = action.GetBindingDisplayString(
                         bindingIndex,
                         out deviceLayoutName,
@@ -235,9 +307,17 @@ namespace HelloDev.Input
                 }
                 else if (action.bindings.Count > 0)
                 {
+                    int defaultBindingIndex = 0;
+                    if (LastUsedDeviceTracker.Instance.CurrentDevice.name.Contains("Keyboard") || LastUsedDeviceTracker.Instance.CurrentDevice.name.Contains("Mouse"))
+                    {
+                        defaultBindingIndex = iconProvider.FallbackKeyboardIndex;
+                    } else if (LastUsedDeviceTracker.Instance.CurrentDevice.name.Contains("Gamepad"))
+                    {
+                        defaultBindingIndex = iconProvider.FallbackGamepadIndex;
+                    }
                     // Fallback to first binding if bindingId not found
                     displayString = action.GetBindingDisplayString(
-                        0,
+                        defaultBindingIndex,
                         out deviceLayoutName,
                         out controlPath,
                         displayStringOptions
@@ -302,7 +382,7 @@ namespace HelloDev.Input
                 {
                     bindingText.gameObject.SetActive(false);
                 }
-                else
+                else if (!preferIcon)
                 {
                     bindingText.text = string.Format(textFormat, altText);
                     bindingText.gameObject.SetActive(true);
@@ -312,7 +392,7 @@ namespace HelloDev.Input
 
         private void SetTextDisplay(string text)
         {
-            if (bindingText != null)
+            if (bindingText != null && !preferIcon)
             {
                 bindingText.text = string.Format(textFormat, text);
                 bindingText.gameObject.SetActive(true);
@@ -339,7 +419,21 @@ namespace HelloDev.Input
 
         #endregion
 
-        #region Static Event Handler
+        #region Cache Management
+
+        /// <summary>
+        /// Invalidates the cached binding index.
+        /// Called when action or binding changes.
+        /// </summary>
+        private void InvalidateCache()
+        {
+            _cachedActionId = null;
+            _cachedBindingIndex = -1;
+        }
+
+        #endregion
+
+        #region Static Event Handler (Option A)
 
         // Static handler - updates all instances when bindings change (Unity's pattern)
         private static void OnActionChange(object obj, InputActionChange change)
@@ -362,6 +456,7 @@ namespace HelloDev.Input
                     referencedAction.actionMap == actionMap ||
                     referencedAction.actionMap?.asset == actionAsset)
                 {
+                    component.InvalidateCache();
                     component.UpdateBindingDisplay();
                 }
             }
@@ -411,6 +506,7 @@ namespace HelloDev.Input
         {
             if (Application.isPlaying)
             {
+                InvalidateCache();
                 UpdateBindingDisplay();
             }
         }

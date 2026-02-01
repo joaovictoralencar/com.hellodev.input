@@ -42,6 +42,12 @@ namespace HelloDev.Input
 
         [Tooltip("Fallback icon map when no layout matches (typically keyboard)")]
         [SerializeField] private InputIconMap_SO fallbackIconMap;
+        
+        [Tooltip("Fallback keyboard binding index when no layout matches (typically keyboard of index 0)")]
+        [SerializeField] private int fallbackKeyboardIndex;
+        
+        [Tooltip("Fallback gamepad binding index when no layout matches (typically gamepad of index 1)")]
+        [SerializeField] private int fallbackGamepadIndex = 1;
 
         /// <summary>
         /// All registered icon maps.
@@ -52,6 +58,10 @@ namespace HelloDev.Input
         /// The fallback icon map used when no match is found.
         /// </summary>
         public InputIconMap_SO FallbackIconMap => fallbackIconMap;
+
+        public int FallbackGamepadIndex => fallbackGamepadIndex;
+        public int FallbackKeyboardIndex => fallbackKeyboardIndex;
+
 
         /// <summary>
         /// Gets the icon map that best matches the given device layout.
@@ -64,7 +74,6 @@ namespace HelloDev.Input
             if (string.IsNullOrEmpty(deviceLayoutName))
                 return fallbackIconMap;
 
-#if ENABLE_INPUT_SYSTEM
             // First pass: exact match
             foreach (var iconMap in iconMaps)
             {
@@ -86,19 +95,6 @@ namespace HelloDev.Input
                     return iconMap;
                 }
             }
-#else
-            // Without Input System, just do string contains matching
-            foreach (var iconMap in iconMaps)
-            {
-                if (iconMap == null) continue;
-
-                if (deviceLayoutName.Contains(iconMap.DeviceLayoutName, StringComparison.OrdinalIgnoreCase) ||
-                    iconMap.DeviceLayoutName.Contains(deviceLayoutName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return iconMap;
-                }
-            }
-#endif
 
             return fallbackIconMap;
         }

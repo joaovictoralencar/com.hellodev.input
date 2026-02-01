@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d0bf646f1a499a6469fb41169e1d75ec, type: 3}
   m_Name: PS4IconMap
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   deviceLayoutName: DualShockGamepad
   mappings:
   - controlPath: buttonSouth
@@ -47,3 +47,30 @@ MonoBehaviour:
   - controlPath: rightTriggerButton
     icon: {fileID: 21300000, guid: 87dce22414624c74d90f8bfc4bf3582f, type: 3}
     fallbackText: R2
+  - controlPath: select
+    icon: {fileID: 21300000, guid: a521d4effb3d3c64b9329370383eb640, type: 3}
+    fallbackText: Select
+  - controlPath: leftStick
+    icon: {fileID: 21300000, guid: 7e177675a5fc16248b6e164ef7a7f2a6, type: 3}
+    fallbackText: LS
+  - controlPath: rightStick
+    icon: {fileID: 21300000, guid: 04f2711270cd5b64099d2ca2f99529de, type: 3}
+    fallbackText: RS
+  - controlPath: leftStickPress
+    icon: {fileID: 21300000, guid: 7e177675a5fc16248b6e164ef7a7f2a6, type: 3}
+    fallbackText: L3
+  - controlPath: rightStickPress
+    icon: {fileID: 21300000, guid: 04f2711270cd5b64099d2ca2f99529de, type: 3}
+    fallbackText: R3
+  - controlPath: dpad/up
+    icon: {fileID: 21300000, guid: f375a935d0c38f84d94844236012f26c, type: 3}
+    fallbackText: Up
+  - controlPath: dpad/down
+    icon: {fileID: 21300000, guid: 5fc2490d4f2941f4ca46f33e329cf3d7, type: 3}
+    fallbackText: Down
+  - controlPath: dpad/left
+    icon: {fileID: 21300000, guid: 4cb9b89846007d142a4a78a190c2d6fe, type: 3}
+    fallbackText: Left
+  - controlPath: dpad/right
+    icon: {fileID: 21300000, guid: be71706bc979d5240bf156bfdfee0ae6, type: 3}
+    fallbackText: Right

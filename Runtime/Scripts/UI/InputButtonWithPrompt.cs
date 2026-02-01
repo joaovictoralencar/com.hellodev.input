@@ -3,6 +3,8 @@ using HelloDev.Utils;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using TMPro;
+using Logger = HelloDev.Logging.Logger;
 
 namespace HelloDev.Input
 {
@@ -22,6 +24,14 @@ namespace HelloDev.Input
     /// <para>
     /// The coordinator syncs the ActionReference and BindingId to both children,
     /// and forwards the OnActionPerformed event from InputActionButton.
+    /// </para>
+    /// <para>
+    /// <b>Device Tracking:</b> If <see cref="LastUsedDeviceTracker"/> is present in the scene,
+    /// prompts automatically update when the player switches between keyboard, mouse, and gamepad.
+    /// </para>
+    /// <para>
+    /// <b>Button Label:</b> Optionally set a <see cref="buttonLabel"/> to automatically update
+    /// text with the current binding display string (e.g., "Press Space" or "Press A").
     /// </para>
     /// <para>
     /// <b>Pyramid Architecture:</b>
@@ -55,6 +65,14 @@ namespace HelloDev.Input
         [Tooltip("Child InputPromptDisplay - auto-found in children if not set")]
         [SerializeField] private InputPromptDisplay inputPromptDisplay;
 
+        [Header("Button Label (Optional)")]
+        [Tooltip("Optional text component to update with binding display text (e.g., 'Press Space' or 'Press A')")]
+        [SerializeField] private TMP_Text buttonLabel;
+
+        [Header("Device Tracking")]
+        [Tooltip("Auto-update prompts when device changes (requires LastUsedDeviceTracker in scene)")]
+        [SerializeField] private bool autoUpdateOnDeviceChange = true;
+
         [Header("Events")]
         [Tooltip("Invoked when the action is performed (forwarded from child InputActionButton)")]
         [SerializeField] private UnityEvent onActionPerformed = new();
@@ -67,6 +85,8 @@ namespace HelloDev.Input
         #region Private Fields
 
         private bool _isSubscribed;
+        private bool _subscribedToDeviceTracker;
+        private bool _subscribedToPromptUpdates;
 
         #endregion
 
@@ -112,6 +132,15 @@ namespace HelloDev.Input
         }
 
         /// <summary>
+        /// Optional button label that displays binding text.
+        /// </summary>
+        public TMP_Text ButtonLabel
+        {
+            get => buttonLabel;
+            set => buttonLabel = value;
+        }
+
+        /// <summary>
         /// Event invoked when the action is performed (forwarded from child InputActionButton).
         /// </summary>
         public UnityEvent OnActionPerformed => onActionPerformed;
@@ -145,11 +174,15 @@ namespace HelloDev.Input
         {
             SyncToChildren();
             SubscribeToChildEvents();
+            SubscribeToDeviceTracker();
+            SubscribeToPromptUpdates();
         }
 
         private void OnDisable()
         {
             UnsubscribeFromChildEvents();
+            UnsubscribeFromDeviceTracker();
+            UnsubscribeFromPromptUpdates();
         }
 
         #endregion
@@ -169,7 +202,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logging.Logger.Log(LogSystems.Input, $"Found children - " +
+                Logging.Logger.LogVerbose(LogSystems.Input, $"Found children - " +
                                                 $"InputActionButton: {(inputActionButton != null ? "Yes" : "No")}, " +
                                                 $"InputPromptDisplay: {(inputPromptDisplay != null ? "Yes" : "No")}", this);
             }
@@ -187,7 +220,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logging.Logger.Log(LogSystems.Input,$"Synced ActionReference to InputActionButton: {(actionReference != null ? actionReference.action?.name : "null")}", this);
+                    Logging.Logger.LogVerbose(LogSystems.Input,$"Synced ActionReference to InputActionButton: {(actionReference != null ? actionReference.action?.name : "null")}", this);
                 }
             }
 
@@ -204,9 +237,12 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logging.Logger.Log(LogSystems.Input,$"Synced to InputPromptDisplay. Action={actionReference?.action?.name}, BindingId={bindingId}", this);
+                    Logging.Logger.LogVerbose(LogSystems.Input,$"Synced to InputPromptDisplay. Action={actionReference?.action?.name}, BindingId={bindingId}", this);
                 }
             }
+
+            // Note: Subscription to OnUpdateBindingUI is handled in OnEnable, not here
+            // This prevents memory leaks from duplicate subscriptions
         }
 
         private void SubscribeToChildEvents()
@@ -221,7 +257,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logging.Logger.Log(LogSystems.Input,"Subscribed to InputActionButton.OnActionPerformed", this);
+                    Logging.Logger.LogVerbose(LogSystems.Input,"Subscribed to InputActionButton.OnActionPerformed", this);
                 }
             }
         }
@@ -243,10 +279,128 @@ namespace HelloDev.Input
         {
             if (enableDebugLogging)
             {
-                Logging.Logger.Log(LogSystems.Input,"Forwarding OnActionPerformed from child", this);
+                Logging.Logger.LogVerbose(LogSystems.Input,"Forwarding OnActionPerformed from child", this);
             }
 
             onActionPerformed?.Invoke();
+        }
+
+        #endregion
+
+        #region Device Tracking (Options B + C)
+
+        private void SubscribeToDeviceTracker()
+        {
+            // Only subscribe if we don't have an InputPromptDisplay
+            // (otherwise InputPromptDisplay handles device tracking itself)
+            if (!autoUpdateOnDeviceChange || _subscribedToDeviceTracker)
+                return;
+
+            if (inputPromptDisplay != null)
+                return; // InputPromptDisplay handles it
+
+            var tracker = LastUsedDeviceTracker.Instance;
+            if (tracker != null)
+            {
+                tracker.DeviceChanged += OnDeviceChanged;
+                _subscribedToDeviceTracker = true;
+
+                if (enableDebugLogging)
+                {
+                    Logger.LogVerbose(LogSystems.Input, "Subscribed to LastUsedDeviceTracker", this);
+                }
+            }
+            else if (enableDebugLogging)
+            {
+                Logger.LogVerbose(LogSystems.Input, 
+                    "LastUsedDeviceTracker not found - device-aware updates disabled", this);
+            }
+        }
+
+        private void UnsubscribeFromDeviceTracker()
+        {
+            if (!_subscribedToDeviceTracker)
+                return;
+
+            var tracker = LastUsedDeviceTracker.Instance;
+            if (tracker != null)
+            {
+                tracker.DeviceChanged -= OnDeviceChanged;
+            }
+
+            _subscribedToDeviceTracker = false;
+        }
+
+        private void OnDeviceChanged(InputDevice previousDevice, InputDevice newDevice)
+        {
+            if (enableDebugLogging)
+            {
+                Logger.LogVerbose(LogSystems.Input,
+                    $"Device changed to {newDevice.name} - updating display", this);
+            }
+
+            UpdateBindingDisplay();
+        }
+
+        #endregion
+
+        #region Button Label Updates
+
+        private void SubscribeToPromptUpdates()
+        {
+            if (_subscribedToPromptUpdates || inputPromptDisplay == null)
+                return;
+
+            inputPromptDisplay.OnUpdateBindingUI.AddListener(OnPromptDisplayUpdated);
+            _subscribedToPromptUpdates = true;
+
+            if (enableDebugLogging)
+            {
+                Logger.LogVerbose(LogSystems.Input, "Subscribed to InputPromptDisplay.OnUpdateBindingUI", this);
+            }
+        }
+
+        private void UnsubscribeFromPromptUpdates()
+        {
+            if (!_subscribedToPromptUpdates || inputPromptDisplay == null)
+                return;
+
+            inputPromptDisplay.OnUpdateBindingUI.RemoveListener(OnPromptDisplayUpdated);
+            _subscribedToPromptUpdates = false;
+        }
+
+        private void OnPromptDisplayUpdated(InputPromptDisplay display, string displayString,
+                                           string deviceLayout, string controlPath)
+        {
+            UpdateButtonLabel(displayString);
+        }
+
+        /// <summary>
+        /// Updates the button label with the current binding display text.
+        /// Called automatically when binding display updates.
+        /// </summary>
+        private void UpdateButtonLabel(string displayText)
+        {
+            if (buttonLabel == null)
+                return;
+
+            if (string.IsNullOrEmpty(displayText))
+            {
+                // Optionally hide label when empty
+                if (buttonLabel.gameObject.activeSelf)
+                    buttonLabel.gameObject.SetActive(false);
+                return;
+            }
+
+            if (!buttonLabel.gameObject.activeSelf)
+                buttonLabel.gameObject.SetActive(true);
+
+            buttonLabel.text = displayText;
+
+            if (enableDebugLogging)
+            {
+                Logger.LogVerbose(LogSystems.Input, $"Updated button label: {displayText}", this);
+            }
         }
 
         #endregion
@@ -340,10 +494,8 @@ namespace HelloDev.Input
                 if (inputPromptDisplay == null)
                     inputPromptDisplay = GetComponentInChildren<InputPromptDisplay>();
             }
-            else
-            {
-                SyncToChildren();
-            }
+            // Don't call SyncToChildren in play mode - OnEnable handles it
+            // This prevents memory leaks from duplicate event subscriptions
         }
 #endif
     }
