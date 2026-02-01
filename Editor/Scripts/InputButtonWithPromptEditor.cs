@@ -7,7 +7,8 @@ using UnityEngine.InputSystem;
 namespace HelloDev.Input.Editor
 {
     /// <summary>
-    /// Custom editor for InputButtonWithPrompt that provides a binding dropdown.
+    /// Custom editor for InputButtonWithPrompt that provides a binding dropdown
+    /// and shows the coordinator's relationship to child components.
     /// </summary>
     [CustomEditor(typeof(InputButtonWithPrompt))]
     public class InputButtonWithPromptEditor : UnityEditor.Editor
@@ -15,14 +16,9 @@ namespace HelloDev.Input.Editor
         private SerializedProperty _actionReferenceProperty;
         private SerializedProperty _bindingIdProperty;
         private SerializedProperty _iconProviderProperty;
-        private SerializedProperty _bindingTextProperty;
-        private SerializedProperty _bindingIconProperty;
-        private SerializedProperty _textFormatProperty;
-        private SerializedProperty _preferIconProperty;
-        private SerializedProperty _exclusiveDisplayProperty;
-        private SerializedProperty _respectCanvasGroupProperty;
+        private SerializedProperty _inputActionButtonProperty;
+        private SerializedProperty _inputPromptDisplayProperty;
         private SerializedProperty _onActionPerformedProperty;
-        private SerializedProperty _updateBindingUIEventProperty;
         private SerializedProperty _enableDebugLoggingProperty;
 
         private GUIContent[] _bindingOptions;
@@ -30,21 +26,22 @@ namespace HelloDev.Input.Editor
         private int _selectedBindingIndex;
 
         private static readonly GUIContent s_BindingLabel = new GUIContent("Binding",
-            "Select which binding of the action to display and respond to");
+            "Select which binding of the action to display");
+
+        private static readonly GUIContent s_FindChildrenButton = new GUIContent("Find Children",
+            "Search for InputActionButton and InputPromptDisplay in children");
+
+        private static readonly GUIContent s_SyncButton = new GUIContent("Sync to Children",
+            "Manually sync ActionReference and BindingId to child components");
 
         private void OnEnable()
         {
             _actionReferenceProperty = serializedObject.FindProperty("actionReference");
             _bindingIdProperty = serializedObject.FindProperty("bindingId");
             _iconProviderProperty = serializedObject.FindProperty("iconProvider");
-            _bindingTextProperty = serializedObject.FindProperty("bindingText");
-            _bindingIconProperty = serializedObject.FindProperty("bindingIcon");
-            _textFormatProperty = serializedObject.FindProperty("textFormat");
-            _preferIconProperty = serializedObject.FindProperty("preferIcon");
-            _exclusiveDisplayProperty = serializedObject.FindProperty("exclusiveDisplay");
-            _respectCanvasGroupProperty = serializedObject.FindProperty("respectCanvasGroup");
+            _inputActionButtonProperty = serializedObject.FindProperty("inputActionButton");
+            _inputPromptDisplayProperty = serializedObject.FindProperty("inputPromptDisplay");
             _onActionPerformedProperty = serializedObject.FindProperty("onActionPerformed");
-            _updateBindingUIEventProperty = serializedObject.FindProperty("updateBindingUIEvent");
             _enableDebugLoggingProperty = serializedObject.FindProperty("enableDebugLogging");
 
             RefreshBindingOptions();
@@ -53,6 +50,16 @@ namespace HelloDev.Input.Editor
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+
+            var coordinator = (InputButtonWithPrompt)target;
+
+            // Info box explaining the coordinator pattern
+            EditorGUILayout.HelpBox(
+                "Coordinator: Syncs ActionReference to child InputActionButton and InputPromptDisplay. " +
+                "Configure display options (text format, icons) on the child InputPromptDisplay.",
+                MessageType.Info);
+
+            EditorGUILayout.Space();
 
             // Input Action section
             EditorGUILayout.LabelField("Input Action", EditorStyles.boldLabel);
@@ -93,32 +100,67 @@ namespace HelloDev.Input.Editor
 
             EditorGUILayout.Space();
 
-            // UI References section
-            EditorGUILayout.LabelField("UI References", EditorStyles.boldLabel);
+            // Child References section
+            EditorGUILayout.LabelField("Child References", EditorStyles.boldLabel);
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.PropertyField(_bindingTextProperty);
-                EditorGUILayout.PropertyField(_bindingIconProperty);
-            }
+                // Show status indicators
+                var hasActionButton = _inputActionButtonProperty.objectReferenceValue != null;
+                var hasPromptDisplay = _inputPromptDisplayProperty.objectReferenceValue != null;
 
-            EditorGUILayout.Space();
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.PropertyField(_inputActionButtonProperty);
+                    DrawStatusIcon(hasActionButton);
+                }
 
-            // Display Options section
-            EditorGUILayout.LabelField("Display Options", EditorStyles.boldLabel);
-            using (new EditorGUI.IndentLevelScope())
-            {
-                EditorGUILayout.PropertyField(_textFormatProperty);
-                EditorGUILayout.PropertyField(_preferIconProperty);
-                EditorGUILayout.PropertyField(_exclusiveDisplayProperty);
-            }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.PropertyField(_inputPromptDisplayProperty);
+                    DrawStatusIcon(hasPromptDisplay);
+                }
 
-            EditorGUILayout.Space();
+                EditorGUILayout.Space(2);
 
-            // Button Options section
-            EditorGUILayout.LabelField("Button Options", EditorStyles.boldLabel);
-            using (new EditorGUI.IndentLevelScope())
-            {
-                EditorGUILayout.PropertyField(_respectCanvasGroupProperty);
+                // Utility buttons
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(s_FindChildrenButton))
+                    {
+                        Undo.RecordObject(coordinator, "Find Child Components");
+                        coordinator.FindChildComponents();
+                        EditorUtility.SetDirty(coordinator);
+                    }
+
+                    using (new EditorGUI.DisabledScope(!Application.isPlaying))
+                    {
+                        if (GUILayout.Button(s_SyncButton))
+                        {
+                            coordinator.SyncToChildren();
+                        }
+                    }
+                }
+
+                // Warning if children not found
+                if (!hasActionButton && !hasPromptDisplay)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No child components found. Add InputActionButton and/or InputPromptDisplay as children, " +
+                        "then click 'Find Children'.",
+                        MessageType.Warning);
+                }
+                else if (!hasActionButton)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No InputActionButton found. Input shortcuts won't work without it.",
+                        MessageType.Info);
+                }
+                else if (!hasPromptDisplay)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No InputPromptDisplay found. Key binding won't be displayed without it.",
+                        MessageType.Info);
+                }
             }
 
             EditorGUILayout.Space();
@@ -128,7 +170,6 @@ namespace HelloDev.Input.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.PropertyField(_onActionPerformedProperty);
-                EditorGUILayout.PropertyField(_updateBindingUIEventProperty);
             }
 
             EditorGUILayout.Space();
@@ -141,6 +182,15 @@ namespace HelloDev.Input.Editor
             }
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawStatusIcon(bool isValid)
+        {
+            var iconContent = isValid
+                ? EditorGUIUtility.IconContent("TestPassed")
+                : EditorGUIUtility.IconContent("TestNormal");
+
+            GUILayout.Label(iconContent, GUILayout.Width(20), GUILayout.Height(EditorGUIUtility.singleLineHeight));
         }
 
         private void RefreshBindingOptions()

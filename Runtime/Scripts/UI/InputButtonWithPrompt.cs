@@ -1,31 +1,36 @@
 using HelloDev.Logging;
+using HelloDev.Utils;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.UI;
 using UnityEngine.InputSystem;
-using TMPro;
-using Logger = HelloDev.Logging.Logger;
 
 namespace HelloDev.Input
 {
     /// <summary>
-    /// Combines InputActionButton functionality with InputPromptDisplay.
-    /// A single component for buttons that respond to input and display their binding.
+    /// Coordinator that finds and syncs InputActionButton and InputPromptDisplay children.
+    /// Follows the Single Responsibility Principle - this component only coordinates,
+    /// it does NOT duplicate the logic of its children.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This is a convenience component that wires up an <see cref="InputActionButton"/>
-    /// with an <see cref="InputPromptDisplay"/>. Use it when you want a button that:
+    /// This is a convenience component that coordinates child components:
     /// </para>
     /// <list type="bullet">
-    /// <item>Responds to an input action (keyboard/gamepad)</item>
-    /// <item>Displays the current binding with icons</item>
-    /// <item>Supports rebinding</item>
+    /// <item><see cref="InputActionButton"/> - handles input and fires events</item>
+    /// <item><see cref="InputPromptDisplay"/> - displays the binding icon/text</item>
     /// </list>
     /// <para>
-    /// For more control, use <see cref="InputActionButton"/> and <see cref="InputPromptDisplay"/>
-    /// separately.
+    /// The coordinator syncs the ActionReference and BindingId to both children,
+    /// and forwards the OnActionPerformed event from InputActionButton.
     /// </para>
+    /// <para>
+    /// <b>Pyramid Architecture:</b>
+    /// </para>
+    /// <list type="bullet">
+    /// <item>Level 1: InputPromptDisplay alone = just displays key</item>
+    /// <item>Level 2: InputActionButton + InputPromptDisplay = key display + input handling</item>
+    /// <item>Level 3: InputButtonWithPrompt coordinates both = unified API</item>
+    /// </list>
     /// </remarks>
     [AddComponentMenu("HelloDev/Input/Input Button With Prompt")]
     public class InputButtonWithPrompt : MonoBehaviour
@@ -33,43 +38,26 @@ namespace HelloDev.Input
         #region Serialized Fields
 
         [Header("Input Action")]
-        [Tooltip("The action that triggers this button and is displayed")]
+        [Tooltip("The action - will be synced to child InputActionButton and InputPromptDisplay")]
         [SerializeField] private InputActionReference actionReference;
 
         [Tooltip("ID of the specific binding to display (selected via dropdown in editor)")]
         [SerializeField] private string bindingId;
 
         [Header("Icon Provider")]
-        [Tooltip("ScriptableObject that provides icon maps for different device layouts")]
+        [Tooltip("Will be synced to child InputPromptDisplay")]
         [SerializeField] private InputIconProvider_SO iconProvider;
 
-        [Header("UI References")]
-        [Tooltip("Text component for displaying binding text")]
-        [SerializeField] private TMP_Text bindingText;
+        [Header("Child References (Auto-found if empty)")]
+        [Tooltip("Child InputActionButton - auto-found in children if not set")]
+        [SerializeField] private InputActionButton inputActionButton;
 
-        [Tooltip("Image component for displaying binding icon")]
-        [SerializeField] private Image bindingIcon;
-
-        [Header("Display Options")]
-        [Tooltip("Format string for text display. {0} = binding text")]
-        [SerializeField] private string textFormat = "[{0}]";
-
-        [Tooltip("If true, prefer showing icon over text when available")]
-        [SerializeField] private bool preferIcon = true;
-
-        [Tooltip("If true, hide icon when showing text and vice versa")]
-        [SerializeField] private bool exclusiveDisplay = true;
-
-        [Header("Button Options")]
-        [Tooltip("If true, only trigger when the GameObject is interactable (checks CanvasGroup)")]
-        [SerializeField] private bool respectCanvasGroup = true;
+        [Tooltip("Child InputPromptDisplay - auto-found in children if not set")]
+        [SerializeField] private InputPromptDisplay inputPromptDisplay;
 
         [Header("Events")]
-        [Tooltip("Invoked when the action is performed")]
+        [Tooltip("Invoked when the action is performed (forwarded from child InputActionButton)")]
         [SerializeField] private UnityEvent onActionPerformed = new();
-
-        [Tooltip("Event fired when binding display updates. Use for custom icon handling.")]
-        [SerializeField] private UpdateBindingUIEvent updateBindingUIEvent;
 
         [Header("Debug")]
         [SerializeField] private bool enableDebugLogging;
@@ -78,41 +66,27 @@ namespace HelloDev.Input
 
         #region Private Fields
 
-        private CanvasGroup _canvasGroup;
-        private static System.Collections.Generic.List<InputButtonWithPrompt> s_Instances;
+        private bool _isSubscribed;
 
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// The action reference.
+        /// The action reference. Setting this syncs to all child components.
         /// </summary>
         public InputActionReference ActionReference
         {
             get => actionReference;
             set
             {
-                // Unsubscribe from old action
-                if (enabled && actionReference?.action != null)
-                {
-                    actionReference.action.performed -= HandleActionPerformed;
-                }
-
                 actionReference = value;
-
-                // Subscribe to new action
-                if (enabled && actionReference?.action != null)
-                {
-                    actionReference.action.performed += HandleActionPerformed;
-                }
-
-                UpdateBindingDisplay();
+                SyncToChildren();
             }
         }
 
         /// <summary>
-        /// ID of the binding being displayed.
+        /// ID of the binding being displayed. Setting this syncs to child InputPromptDisplay.
         /// </summary>
         public string BindingId
         {
@@ -120,31 +94,43 @@ namespace HelloDev.Input
             set
             {
                 bindingId = value;
-                UpdateBindingDisplay();
+                SyncToChildren();
             }
         }
 
         /// <summary>
-        /// Event invoked when the action is performed.
+        /// The icon provider. Setting this syncs to child InputPromptDisplay.
+        /// </summary>
+        public InputIconProvider_SO IconProvider
+        {
+            get => iconProvider;
+            set
+            {
+                iconProvider = value;
+                SyncToChildren();
+            }
+        }
+
+        /// <summary>
+        /// Event invoked when the action is performed (forwarded from child InputActionButton).
         /// </summary>
         public UnityEvent OnActionPerformed => onActionPerformed;
 
         /// <summary>
-        /// Whether this button is currently interactable.
+        /// The child InputActionButton (may be null if not found).
         /// </summary>
-        public bool IsInteractable
-        {
-            get
-            {
-                if (!respectCanvasGroup)
-                    return true;
+        public InputActionButton InputActionButton => inputActionButton;
 
-                if (_canvasGroup == null)
-                    _canvasGroup = GetComponentInParent<CanvasGroup>();
+        /// <summary>
+        /// The child InputPromptDisplay (may be null if not found).
+        /// </summary>
+        public InputPromptDisplay InputPromptDisplay => inputPromptDisplay;
 
-                return _canvasGroup == null || _canvasGroup.interactable;
-            }
-        }
+        /// <summary>
+        /// Whether this button is currently interactable (delegates to child InputActionButton).
+        /// Returns true if no InputActionButton child exists.
+        /// </summary>
+        public bool IsInteractable => inputActionButton == null || inputActionButton.isActiveAndEnabled;
 
         #endregion
 
@@ -152,68 +138,112 @@ namespace HelloDev.Input
 
         private void Awake()
         {
-            if (respectCanvasGroup)
-            {
-                _canvasGroup = GetComponentInParent<CanvasGroup>();
-            }
+            FindChildComponents();
         }
 
         private void OnEnable()
         {
-            // Subscribe to action
-            if (actionReference?.action != null)
-            {
-                actionReference.action.performed += HandleActionPerformed;
-            }
-
-            // Static list for binding change notifications
-            if (s_Instances == null)
-                s_Instances = new System.Collections.Generic.List<InputButtonWithPrompt>();
-
-            s_Instances.Add(this);
-
-            if (s_Instances.Count == 1)
-                InputSystem.onActionChange += OnActionChange;
-
-            UpdateBindingDisplay();
+            SyncToChildren();
+            SubscribeToChildEvents();
         }
 
         private void OnDisable()
         {
-            // Unsubscribe from action
-            if (actionReference?.action != null)
-            {
-                actionReference.action.performed -= HandleActionPerformed;
-            }
-
-            // Remove from static list
-            s_Instances.Remove(this);
-
-            if (s_Instances.Count == 0)
-            {
-                s_Instances = null;
-                InputSystem.onActionChange -= OnActionChange;
-            }
+            UnsubscribeFromChildEvents();
         }
 
         #endregion
 
-        #region Action Handling
+        #region Child Management
 
-        private void HandleActionPerformed(InputAction.CallbackContext context)
+        /// <summary>
+        /// Finds child InputActionButton and InputPromptDisplay if not already assigned.
+        /// </summary>
+        public void FindChildComponents()
         {
-            if (!IsInteractable)
-            {
-                if (enableDebugLogging)
-                {
-                    Logger.LogVerbose(LogSystems.Input, "Action ignored (not interactable)");
-                }
-                return;
-            }
+            if (inputActionButton == null)
+                inputActionButton = GetComponentInChildren<InputActionButton>();
+
+            if (inputPromptDisplay == null)
+                inputPromptDisplay = GetComponentInChildren<InputPromptDisplay>();
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input, "Action performed");
+                Logging.Logger.Log(LogSystems.Input, $"Found children - " +
+                                                $"InputActionButton: {(inputActionButton != null ? "Yes" : "No")}, " +
+                                                $"InputPromptDisplay: {(inputPromptDisplay != null ? "Yes" : "No")}", this);
+            }
+        }
+
+        /// <summary>
+        /// Syncs ActionReference, BindingId, and IconProvider to child components.
+        /// </summary>
+        public void SyncToChildren()
+        {
+            // Sync to InputActionButton
+            if (inputActionButton != null)
+            {
+                inputActionButton.ActionReference = actionReference;
+
+                if (enableDebugLogging)
+                {
+                    Logging.Logger.Log(LogSystems.Input,$"Synced ActionReference to InputActionButton: {(actionReference != null ? actionReference.action?.name : "null")}", this);
+                }
+            }
+
+            // Sync to InputPromptDisplay
+            if (inputPromptDisplay != null)
+            {
+                inputPromptDisplay.ActionReference = actionReference;
+                inputPromptDisplay.BindingId = bindingId;
+
+                if (iconProvider != null)
+                {
+                    inputPromptDisplay.SetIconProvider(iconProvider);
+                }
+
+                if (enableDebugLogging)
+                {
+                    Logging.Logger.Log(LogSystems.Input,$"Synced to InputPromptDisplay. Action={actionReference?.action?.name}, BindingId={bindingId}", this);
+                }
+            }
+        }
+
+        private void SubscribeToChildEvents()
+        {
+            if (_isSubscribed)
+                return;
+
+            if (inputActionButton != null)
+            {
+                inputActionButton.OnActionPerformed.SafeSubscribe(HandleChildActionPerformed);
+                _isSubscribed = true;
+
+                if (enableDebugLogging)
+                {
+                    Logging.Logger.Log(LogSystems.Input,"Subscribed to InputActionButton.OnActionPerformed", this);
+                }
+            }
+        }
+
+        private void UnsubscribeFromChildEvents()
+        {
+            if (!_isSubscribed)
+                return;
+
+            if (inputActionButton != null)
+            {
+                inputActionButton.OnActionPerformed.SafeUnsubscribe(HandleChildActionPerformed);
+            }
+
+            _isSubscribed = false;
+        }
+
+        private void HandleChildActionPerformed()
+        {
+            if (enableDebugLogging)
+            {
+                Logging.Logger.Log(LogSystems.Input,"Forwarding OnActionPerformed from child", this);
             }
 
             onActionPerformed?.Invoke();
@@ -221,229 +251,75 @@ namespace HelloDev.Input
 
         #endregion
 
-        #region Display Logic
+        #region Public API
 
         /// <summary>
-        /// Refreshes the binding display.
-        /// </summary>
-        public void UpdateBindingDisplay()
-        {
-            var displayString = string.Empty;
-            var deviceLayoutName = default(string);
-            var controlPath = default(string);
-
-            var action = actionReference?.action;
-            if (action != null)
-            {
-                var bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
-                if (bindingIndex != -1)
-                {
-                    displayString = action.GetBindingDisplayString(
-                        bindingIndex,
-                        out deviceLayoutName,
-                        out controlPath,
-                        InputBinding.DisplayStringOptions.DontUseShortDisplayNames
-                    );
-                }
-                else if (action.bindings.Count > 0)
-                {
-                    displayString = action.GetBindingDisplayString(
-                        0,
-                        out deviceLayoutName,
-                        out controlPath,
-                        InputBinding.DisplayStringOptions.DontUseShortDisplayNames
-                    );
-                }
-            }
-
-            UpdateBuiltInDisplay(displayString, deviceLayoutName, controlPath);
-            updateBindingUIEvent?.Invoke(null, displayString, deviceLayoutName, controlPath);
-        }
-
-        private void UpdateBuiltInDisplay(string displayString, string deviceLayoutName, string controlPath)
-        {
-            if (string.IsNullOrEmpty(displayString))
-            {
-                SetDisplayEmpty();
-                return;
-            }
-
-            Sprite icon = null;
-            string fallbackText = displayString;
-
-            if (iconProvider != null && !string.IsNullOrEmpty(controlPath))
-            {
-                var (mappedIcon, mappedText) = iconProvider.GetBinding(deviceLayoutName, controlPath);
-                if (mappedIcon != null)
-                {
-                    icon = mappedIcon;
-                }
-                if (!string.IsNullOrEmpty(mappedText))
-                {
-                    fallbackText = mappedText;
-                }
-            }
-
-            if (preferIcon && icon != null)
-            {
-                SetIconDisplay(icon, fallbackText);
-            }
-            else
-            {
-                SetTextDisplay(fallbackText);
-            }
-        }
-
-        private void SetIconDisplay(Sprite icon, string altText)
-        {
-            if (bindingIcon != null)
-            {
-                bindingIcon.sprite = icon;
-                bindingIcon.gameObject.SetActive(true);
-            }
-
-            if (bindingText != null)
-            {
-                if (exclusiveDisplay)
-                {
-                    bindingText.gameObject.SetActive(false);
-                }
-                else
-                {
-                    bindingText.text = string.Format(textFormat, altText);
-                    bindingText.gameObject.SetActive(true);
-                }
-            }
-        }
-
-        private void SetTextDisplay(string text)
-        {
-            if (bindingText != null)
-            {
-                bindingText.text = string.Format(textFormat, text);
-                bindingText.gameObject.SetActive(true);
-            }
-
-            if (bindingIcon != null && exclusiveDisplay)
-            {
-                bindingIcon.gameObject.SetActive(false);
-            }
-        }
-
-        private void SetDisplayEmpty()
-        {
-            if (bindingText != null)
-            {
-                bindingText.text = string.Empty;
-            }
-
-            if (bindingIcon != null)
-            {
-                bindingIcon.gameObject.SetActive(false);
-            }
-        }
-
-        #endregion
-
-        #region Static Event Handler
-
-        private static void OnActionChange(object obj, InputActionChange change)
-        {
-            if (change != InputActionChange.BoundControlsChanged)
-                return;
-
-            var action = obj as InputAction;
-            var actionMap = action?.actionMap ?? obj as InputActionMap;
-            var actionAsset = actionMap?.asset ?? obj as InputActionAsset;
-
-            for (var i = 0; i < s_Instances.Count; ++i)
-            {
-                var component = s_Instances[i];
-                var referencedAction = component.actionReference?.action;
-                if (referencedAction == null)
-                    continue;
-
-                if (referencedAction == action ||
-                    referencedAction.actionMap == actionMap ||
-                    referencedAction.actionMap?.asset == actionAsset)
-                {
-                    component.UpdateBindingDisplay();
-                }
-            }
-        }
-
-        #endregion
-
-        #region Public Methods
-
-        /// <summary>
-        /// Manually triggers the action performed event.
+        /// Manually triggers the action (delegates to child InputActionButton).
+        /// Does nothing if no InputActionButton child exists.
         /// </summary>
         public void TriggerAction()
         {
-            if (!IsInteractable)
-                return;
-
-            onActionPerformed?.Invoke();
+            if (inputActionButton != null)
+            {
+                inputActionButton.TriggerAction();
+            }
+            else
+            {
+                // No InputActionButton, just fire our event directly
+                onActionPerformed?.Invoke();
+            }
         }
 
         /// <summary>
-        /// Sets the icon provider at runtime.
+        /// Updates the binding display (delegates to child InputPromptDisplay).
+        /// Does nothing if no InputPromptDisplay child exists.
         /// </summary>
-        public void SetIconProvider(InputIconProvider_SO provider)
+        public void UpdateBindingDisplay()
         {
-            iconProvider = provider;
-            UpdateBindingDisplay();
+            inputPromptDisplay?.UpdateBindingDisplay();
         }
 
         /// <summary>
         /// Starts an interactive rebind for this action.
+        /// Requires InputRebindManager in scene and child InputActionButton.
         /// </summary>
         /// <param name="bindingIndex">The binding index to rebind (-1 for auto)</param>
         public void StartRebind(int bindingIndex = -1)
         {
-            var manager = InputRebindManager.Instance;
-            if (manager == null)
+            if (inputActionButton != null)
             {
-                Logger.LogWarning(LogSystems.Input, "Cannot rebind: InputRebindManager not found");
-                return;
+                inputActionButton.StartRebind(bindingIndex);
             }
-
-            if (bindingIndex < 0 && !string.IsNullOrEmpty(bindingId))
+            else
             {
-                var action = actionReference?.action;
-                if (action != null)
-                {
-                    bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
-                }
+                Debug.LogWarning("[InputButtonWithPrompt] Cannot rebind: no InputActionButton child found", this);
             }
-
-            manager.StartRebind(actionReference, bindingIndex);
         }
 
         /// <summary>
         /// Resets this action's bindings to default.
+        /// Requires InputRebindManager in scene and child InputActionButton.
         /// </summary>
-        public void ResetBinding()
+        /// <param name="bindingIndex">The binding index to reset (-1 for all)</param>
+        public void ResetBinding(int bindingIndex = -1)
         {
-            var manager = InputRebindManager.Instance;
-            if (manager == null)
+            if (inputActionButton != null)
             {
-                Logger.LogWarning(LogSystems.Input, "Cannot reset: InputRebindManager not found");
-                return;
+                inputActionButton.ResetBinding(bindingIndex);
             }
-
-            var bindingIndex = -1;
-            if (!string.IsNullOrEmpty(bindingId))
+            else
             {
-                var action = actionReference?.action;
-                if (action != null)
-                {
-                    bindingIndex = action.bindings.IndexOf(x => x.id.ToString() == bindingId);
-                }
+                Debug.LogWarning("[InputButtonWithPrompt] Cannot reset binding: no InputActionButton child found", this);
             }
+        }
 
-            manager.ResetBinding(actionReference, bindingIndex);
+        /// <summary>
+        /// Gets the binding index for the current bindingId.
+        /// Returns -1 if not found or no InputPromptDisplay child exists.
+        /// </summary>
+        public int GetBindingIndex()
+        {
+            return inputPromptDisplay?.GetBindingIndex() ?? -1;
         }
 
         #endregion
@@ -451,16 +327,22 @@ namespace HelloDev.Input
 #if UNITY_EDITOR
         private void Reset()
         {
-            _canvasGroup = GetComponentInParent<CanvasGroup>();
-            bindingText = GetComponentInChildren<TMP_Text>();
-            bindingIcon = GetComponentInChildren<Image>();
+            FindChildComponents();
         }
 
         private void OnValidate()
         {
-            if (Application.isPlaying)
+            // In edit mode, try to find children if not assigned
+            if (!Application.isPlaying)
             {
-                UpdateBindingDisplay();
+                if (inputActionButton == null)
+                    inputActionButton = GetComponentInChildren<InputActionButton>();
+                if (inputPromptDisplay == null)
+                    inputPromptDisplay = GetComponentInChildren<InputPromptDisplay>();
+            }
+            else
+            {
+                SyncToChildren();
             }
         }
 #endif

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HelloDev.Logging;
 using UnityEngine;
 using UnityEngine.Events;
@@ -32,17 +33,40 @@ namespace HelloDev.Input
         [SerializeField] private UnityEvent onActionPerformed = new();
 
         [Header("Options")]
-        [Tooltip("If true, only trigger when the GameObject is interactable (checks CanvasGroup)")]
-        [SerializeField] private bool respectCanvasGroup = true;
+        [Tooltip("If true, this component will enable/disable the action. Disable if another system (e.g., PlayerInput) manages the action.")]
+        [SerializeField] private bool manageActionState = true;
 
         [Header("Debug")]
         [SerializeField] private bool enableDebugLogging;
 
         #endregion
 
-        #region Private Fields
+        #region Static Reference Counting
 
-        private CanvasGroup _canvasGroup;
+        /// <summary>
+        /// Tracks how many InputActionButton instances are actively managing each action.
+        /// Prevents OnDisable from disabling an action that another instance still needs.
+        /// </summary>
+        private static readonly Dictionary<InputAction, int> _actionRefCounts = new();
+
+        private static void IncrementRefCount(InputAction action)
+        {
+            _actionRefCounts.TryGetValue(action, out int count);
+            _actionRefCounts[action] = count + 1;
+        }
+
+        private static bool DecrementRefCount(InputAction action)
+        {
+            if (!_actionRefCounts.TryGetValue(action, out int count)) return true;
+            count--;
+            if (count <= 0)
+            {
+                _actionRefCounts.Remove(action);
+                return true; // Last reference, safe to disable
+            }
+            _actionRefCounts[action] = count;
+            return false; // Other instances still active
+        }
 
         #endregion
 
@@ -56,18 +80,27 @@ namespace HelloDev.Input
             get => actionReference;
             set
             {
-                // Unsubscribe from old action
+                // Unsubscribe and disable old action
                 if (enabled && actionReference?.action != null)
                 {
                     actionReference.action.performed -= HandleActionPerformed;
+                    if (manageActionState && DecrementRefCount(actionReference.action))
+                    {
+                        actionReference.action.Disable();
+                    }
                 }
 
                 actionReference = value;
 
-                // Subscribe to new action
+                // Subscribe and enable new action
                 if (enabled && actionReference?.action != null)
                 {
                     actionReference.action.performed += HandleActionPerformed;
+                    if (manageActionState)
+                    {
+                        IncrementRefCount(actionReference.action);
+                        actionReference.action.Enable();
+                    }
                 }
             }
         }
@@ -78,33 +111,18 @@ namespace HelloDev.Input
         public UnityEvent OnActionPerformed => onActionPerformed;
 
         /// <summary>
-        /// Whether this button is currently interactable.
+        /// If true, this component enables/disables the action.
+        /// Set to false if another system (e.g., PlayerInput) manages the action state.
         /// </summary>
-        public bool IsInteractable
+        public bool ManageActionState
         {
-            get
-            {
-                if (!respectCanvasGroup)
-                    return true;
-
-                if (_canvasGroup == null)
-                    _canvasGroup = GetComponentInParent<CanvasGroup>();
-
-                return _canvasGroup == null || _canvasGroup.interactable;
-            }
+            get => manageActionState;
+            set => manageActionState = value;
         }
 
         #endregion
 
         #region Unity Lifecycle
-
-        private void Awake()
-        {
-            if (respectCanvasGroup)
-            {
-                _canvasGroup = GetComponentInParent<CanvasGroup>();
-            }
-        }
 
         private void OnEnable()
         {
@@ -112,9 +130,15 @@ namespace HelloDev.Input
             {
                 actionReference.action.performed += HandleActionPerformed;
 
+                if (manageActionState)
+                {
+                    IncrementRefCount(actionReference.action);
+                    actionReference.action.Enable();
+                }
+
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input, $"Subscribed to action '{actionReference.action.name}'");
+                    Logger.Log(LogSystems.Input, $"Subscribed to action '{actionReference.action.name}' (enabled: {actionReference.action.enabled})");
                 }
             }
         }
@@ -124,6 +148,11 @@ namespace HelloDev.Input
             if (actionReference?.action != null)
             {
                 actionReference.action.performed -= HandleActionPerformed;
+
+                if (manageActionState && DecrementRefCount(actionReference.action))
+                {
+                    actionReference.action.Disable();
+                }
 
                 if (enableDebugLogging)
                 {
@@ -138,14 +167,7 @@ namespace HelloDev.Input
 
         private void HandleActionPerformed(InputAction.CallbackContext context)
         {
-            if (!IsInteractable)
-            {
-                if (enableDebugLogging)
-                {
-                    Logger.Log(LogSystems.Input, $" Action '{actionReference.action.name}' ignored (not interactable)", this);
-                }
-                return;
-            }
+            if (this == null) return;
 
             if (enableDebugLogging)
             {
@@ -164,9 +186,6 @@ namespace HelloDev.Input
         /// </summary>
         public void TriggerAction()
         {
-            if (!IsInteractable)
-                return;
-
             onActionPerformed?.Invoke();
         }
 
@@ -233,12 +252,5 @@ namespace HelloDev.Input
 
         #endregion
 
-#if UNITY_EDITOR
-        private void Reset()
-        {
-            // Auto-find CanvasGroup
-            _canvasGroup = GetComponentInParent<CanvasGroup>();
-        }
-#endif
     }
 }

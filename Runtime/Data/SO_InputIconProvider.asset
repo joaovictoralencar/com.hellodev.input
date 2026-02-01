@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f05c4712c8211b4b9d505c6e03aab8c, type: 3}
+  m_Name: SO_InputIconProvider
+  m_EditorClassIdentifier: HelloDev.Input::HelloDev.Input.InputIconProvider_SO
+  iconMaps:
+  - {fileID: 11400000, guid: e3317eff5e51f4344b03d661821aee66, type: 2}
+  - {fileID: 11400000, guid: 698c2705fdd4d0645ad702ab2b416137, type: 2}
+  - {fileID: 11400000, guid: fd50347e3a720544cb62df6508a9678e, type: 2}
+  fallbackIconMap: {fileID: 11400000, guid: e3317eff5e51f4344b03d661821aee66, type: 2}

@@ -11,108 +11,108 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d0bf646f1a499a6469fb41169e1d75ec, type: 3}
   m_Name: KeyboardIconMap
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   deviceLayoutName: Keyboard
   mappings:
   - controlPath: k
-    icon: {fileID: 0}
+    icon: {fileID: 1072175574, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: K
   - controlPath: backspace
-    icon: {fileID: 0}
+    icon: {fileID: -1575103291, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Backspace
   - controlPath: space
-    icon: {fileID: 0}
+    icon: {fileID: -1476951808, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Space
   - controlPath: enter
-    icon: {fileID: 0}
+    icon: {fileID: 176924562, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Enter
   - controlPath: escape
-    icon: {fileID: 0}
+    icon: {fileID: -412285690, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Esc
   - controlPath: tab
-    icon: {fileID: 0}
+    icon: {fileID: 17416562, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Tab
   - controlPath: leftShift
-    icon: {fileID: 0}
+    icon: {fileID: -2120801154, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Shift
   - controlPath: leftCtrl
-    icon: {fileID: 0}
+    icon: {fileID: 903176140, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Ctrl
   - controlPath: leftAlt
-    icon: {fileID: 0}
+    icon: {fileID: -1497371589, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Alt
   - controlPath: a
-    icon: {fileID: 0}
+    icon: {fileID: 493669154, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: A
   - controlPath: b
-    icon: {fileID: 0}
+    icon: {fileID: -1182562039, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: B
   - controlPath: c
-    icon: {fileID: 0}
+    icon: {fileID: 60565751, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: C
   - controlPath: d
-    icon: {fileID: 0}
+    icon: {fileID: -948022478, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: D
   - controlPath: e
-    icon: {fileID: 0}
+    icon: {fileID: -1350719223, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: E
   - controlPath: f
-    icon: {fileID: 0}
+    icon: {fileID: -1569355150, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: F
   - controlPath: g
-    icon: {fileID: 0}
+    icon: {fileID: -670361210, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: G
   - controlPath: h
-    icon: {fileID: 0}
+    icon: {fileID: 778978904, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: H
   - controlPath: i
-    icon: {fileID: 0}
+    icon: {fileID: 1195002773, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: I
   - controlPath: j
-    icon: {fileID: 0}
+    icon: {fileID: -1555533735, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: J
   - controlPath: l
-    icon: {fileID: 0}
+    icon: {fileID: -202709270, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: L
   - controlPath: m
-    icon: {fileID: 0}
+    icon: {fileID: -1703588117, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: M
   - controlPath: n
-    icon: {fileID: 0}
+    icon: {fileID: 476792018, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: N
   - controlPath: o
-    icon: {fileID: 0}
+    icon: {fileID: -346547585, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: O
   - controlPath: p
-    icon: {fileID: 0}
+    icon: {fileID: -2097954319, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: P
   - controlPath: q
-    icon: {fileID: 0}
+    icon: {fileID: 182514567, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Q
   - controlPath: r
-    icon: {fileID: 0}
+    icon: {fileID: 963395442, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: R
   - controlPath: s
-    icon: {fileID: 0}
+    icon: {fileID: 1766541742, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: S
   - controlPath: t
-    icon: {fileID: 0}
+    icon: {fileID: 1129167679, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: T
   - controlPath: u
-    icon: {fileID: 0}
+    icon: {fileID: 1465294413, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: U
   - controlPath: v
-    icon: {fileID: 0}
+    icon: {fileID: -1333811728, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: V
   - controlPath: w
-    icon: {fileID: 0}
+    icon: {fileID: 405151817, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: W
   - controlPath: x
-    icon: {fileID: 0}
+    icon: {fileID: 801240903, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: X
   - controlPath: y
-    icon: {fileID: 0}
+    icon: {fileID: 45580367, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Y
   - controlPath: z
-    icon: {fileID: 0}
+    icon: {fileID: -122979845, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Z
