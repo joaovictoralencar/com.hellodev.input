@@ -27,7 +27,7 @@ namespace HelloDev.Input
     /// </para>
     /// <para>
     /// <b>Device Tracking:</b> If <see cref="LastUsedDeviceTracker"/> is present in the scene,
-    /// prompts automatically update when the player switches between keyboard, mouse, and gamepad.
+    /// prompts automatically update when the player switches between keyboard/mouse and gamepad.
     /// </para>
     /// <para>
     /// <b>Button Label:</b> Optionally set a <see cref="buttonLabel"/> to automatically update
@@ -69,10 +69,6 @@ namespace HelloDev.Input
         [Tooltip("Optional text component to update with binding display text (e.g., 'Press Space' or 'Press A')")]
         [SerializeField] private TMP_Text buttonLabel;
 
-        [Header("Device Tracking")]
-        [Tooltip("Auto-update prompts when device changes (requires LastUsedDeviceTracker in scene)")]
-        [SerializeField] private bool autoUpdateOnDeviceChange = true;
-
         [Header("Events")]
         [Tooltip("Invoked when the action is performed (forwarded from child InputActionButton)")]
         [SerializeField] private UnityEvent onActionPerformed = new();
@@ -85,7 +81,6 @@ namespace HelloDev.Input
         #region Private Fields
 
         private bool _isSubscribed;
-        private bool _subscribedToDeviceTracker;
         private bool _subscribedToPromptUpdates;
 
         #endregion
@@ -174,14 +169,12 @@ namespace HelloDev.Input
         {
             SyncToChildren();
             SubscribeToChildEvents();
-            SubscribeToDeviceTracker();
             SubscribeToPromptUpdates();
         }
 
         private void OnDisable()
         {
             UnsubscribeFromChildEvents();
-            UnsubscribeFromDeviceTracker();
             UnsubscribeFromPromptUpdates();
         }
 
@@ -283,63 +276,6 @@ namespace HelloDev.Input
             }
 
             onActionPerformed?.Invoke();
-        }
-
-        #endregion
-
-        #region Device Tracking (Options B + C)
-
-        private void SubscribeToDeviceTracker()
-        {
-            // Only subscribe if we don't have an InputPromptDisplay
-            // (otherwise InputPromptDisplay handles device tracking itself)
-            if (!autoUpdateOnDeviceChange || _subscribedToDeviceTracker)
-                return;
-
-            if (inputPromptDisplay != null)
-                return; // InputPromptDisplay handles it
-
-            var tracker = LastUsedDeviceTracker.Instance;
-            if (tracker != null)
-            {
-                tracker.DeviceChanged += OnDeviceChanged;
-                _subscribedToDeviceTracker = true;
-
-                if (enableDebugLogging)
-                {
-                    Logger.LogVerbose(LogSystems.Input, "Subscribed to LastUsedDeviceTracker", this);
-                }
-            }
-            else if (enableDebugLogging)
-            {
-                Logger.LogVerbose(LogSystems.Input, 
-                    "LastUsedDeviceTracker not found - device-aware updates disabled", this);
-            }
-        }
-
-        private void UnsubscribeFromDeviceTracker()
-        {
-            if (!_subscribedToDeviceTracker)
-                return;
-
-            var tracker = LastUsedDeviceTracker.Instance;
-            if (tracker != null)
-            {
-                tracker.DeviceChanged -= OnDeviceChanged;
-            }
-
-            _subscribedToDeviceTracker = false;
-        }
-
-        private void OnDeviceChanged(InputDevice previousDevice, InputDevice newDevice)
-        {
-            if (enableDebugLogging)
-            {
-                Logger.LogVerbose(LogSystems.Input,
-                    $"Device changed to {newDevice.name} - updating display", this);
-            }
-
-            UpdateBindingDisplay();
         }
 
         #endregion

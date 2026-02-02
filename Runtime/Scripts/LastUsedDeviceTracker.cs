@@ -3,7 +3,6 @@ using System.Linq;
 using HelloDev.Logging;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.LowLevel;
 using Logger = HelloDev.Logging.Logger;
 
@@ -11,23 +10,24 @@ namespace HelloDev.Input
 {
     /// <summary>
     /// Singleton service that detects when the player switches input devices.
-    /// Fires events to trigger UI updates - does not resolve bindings itself.
+    /// Uses InputSystem.onActionChange for efficient, action-based device tracking.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This component tracks device changes through two mechanisms:
+    /// This component tracks device changes through three mechanisms (in priority order):
     /// </para>
     /// <list type="bullet">
+    /// <item><b>Priority 1 (onActionChange)</b>: Tracks device via action performs (clean, semantic)</item>
+    /// <item><b>Priority 2 (onEvent)</b>: Fallback to raw input if needed (optional, configurable)</item>
+    /// <item><b>Priority 3 (onDeviceChange)</b>: Monitors device lifecycle (plug/unplug)</item>
     /// </list>
     /// <para>
-    /// The tracker fires a <see cref="DeviceChanged"/> event when the active device switches.
-    /// UI components like <see cref="InputPromptDisplay"/> can subscribe to this event and
-    /// refresh their displays. Unity's Input System automatically resolves which binding
-    /// to show based on the current device.
+    /// <b>Keyboard/Mouse Grouping:</b> Keyboard and Mouse are treated as the same device group.
+    /// Switching between them does not trigger a device change event.
     /// </para>
     /// <para>
-    /// <b>Setup:</b> Add this component to a persistent GameObject in your scene.
-    /// It will persist across scene loads via DontDestroyOnLoad.
+    /// <b>Race Condition Safety:</b> Uses <see cref="OnInstanceReady"/> event to notify
+    /// components when the tracker is initialized, preventing null reference errors.
     /// </para>
     /// </remarks>
     [AddComponentMenu("HelloDev/Input/Last Used Device Tracker")]
@@ -41,6 +41,12 @@ namespace HelloDev.Input
         /// Singleton instance. Returns null if not yet initialized.
         /// </summary>
         public static LastUsedDeviceTracker Instance => _instance;
+
+        /// <summary>
+        /// Event fired when the singleton instance is ready.
+        /// Use this to safely subscribe to DeviceChanged without race conditions.
+        /// </summary>
+        public static event Action<LastUsedDeviceTracker> OnInstanceReady;
 
         #endregion
 
@@ -61,19 +67,50 @@ namespace HelloDev.Input
         /// </summary>
         public InputDevice CurrentDevice { get; private set; }
 
+        /// <summary>
+        /// Current device group (Keyboard, Mouse = "KeyboardMouse"; Gamepad = "Gamepad").
+        /// </summary>
+        public string CurrentDeviceGroup { get; private set; }
+
+        /// <summary>
+        /// Gets the device layout appropriate for icon mapping.
+        /// Returns "Keyboard" for Mouse devices (since Mouse has no separate icons).
+        /// </summary>
+        public string CurrentDeviceLayoutForIcons
+        {
+            get
+            {
+                if (CurrentDevice == null)
+                    return null;
+
+                // Redirect Mouse to Keyboard for icon resolution
+                if (CurrentDevice is Mouse)
+                    return "Keyboard";
+
+                return CurrentDevice.layout;
+            }
+        }
+
         #endregion
 
         #region Configuration
 
-        [Header("Options")]
+        [Header("Tracking Options")]
+        [Tooltip("Track device via action performs (Priority 1 - recommended)")]
+        [SerializeField] private bool trackViaActions = true;
+
+        [Tooltip("Track device via raw input events (Priority 2 - fallback if no actions configured)")]
+        [SerializeField] private bool trackViaRawInput = false;
+
+        [Tooltip("Monitor device plug/unplug (Priority 3 - always recommended)")]
+        [SerializeField] private bool monitorDeviceLifecycle = true;
+
+        [Header("Behavior")]
         [Tooltip("Minimum time between device switches to prevent spam")]
         [SerializeField] private float debounceTime = 0.1f;
 
-        [Tooltip("Track last-used device via input events")]
-        [SerializeField] private bool trackLastUsedDevice = true;
-
-        [Tooltip("Monitor device plug/unplug")]
-        [SerializeField] private bool monitorDeviceLifecycle = true;
+        [Tooltip("Treat keyboard and mouse as the same device group (recommended)")]
+        [SerializeField] private bool groupKeyboardMouse = true;
 
         [Header("Debug")]
         [SerializeField] private bool enableDebugLogging;
@@ -95,7 +132,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.LogWarning(LogSystems.Input, 
+                    Logger.LogWarning(LogSystems.Input,
                         "Multiple LastUsedDeviceTracker instances detected. Destroying duplicate.", this);
                 }
                 Destroy(gameObject);
@@ -105,17 +142,33 @@ namespace HelloDev.Input
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
-            // Start with first available device
+            // Initialize with first available device
             InitializeCurrentDevice();
+
+            // Fire ready event for components waiting on initialization
+            OnInstanceReady?.Invoke(this);
+
+            if (enableDebugLogging)
+            {
+                Logger.Log(LogSystems.Input, "LastUsedDeviceTracker initialized and ready.");
+            }
         }
 
         private void OnEnable()
         {
-            if (trackLastUsedDevice)
+            // Priority 1: Track via action performs (most efficient)
+            if (trackViaActions)
+            {
+                InputSystem.onActionChange += OnActionChange;
+            }
+
+            // Priority 2: Fallback to raw input events (optional)
+            if (trackViaRawInput)
             {
                 InputSystem.onEvent += OnInputEvent;
             }
 
+            // Priority 3: Device lifecycle monitoring (plug/unplug)
             if (monitorDeviceLifecycle)
             {
                 InputSystem.onDeviceChange += OnDeviceChange;
@@ -123,13 +176,14 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input, 
-                    $"LastUsedDeviceTracker enabled. Options: trackLastUsed={trackLastUsedDevice}, monitorLifecycle={monitorDeviceLifecycle}");
+                Logger.Log(LogSystems.Input,
+                    $"LastUsedDeviceTracker enabled. Tracking: Actions={trackViaActions}, RawInput={trackViaRawInput}, Lifecycle={monitorDeviceLifecycle}");
             }
         }
 
         private void OnDisable()
         {
+            InputSystem.onActionChange -= OnActionChange;
             InputSystem.onEvent -= OnInputEvent;
             InputSystem.onDeviceChange -= OnDeviceChange;
         }
@@ -164,49 +218,54 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input, 
-                    $"Initialized with device: {CurrentDevice?.name ?? "none"}");
+                Logger.Log(LogSystems.Input,
+                    $"Initialized with device: {CurrentDevice?.name ?? "none"} (Group: {CurrentDeviceGroup})");
             }
         }
 
         #endregion
 
-        #region Event Handlers
+        #region Event Handlers - Priority 1 (Action Change)
+
+        private void OnActionChange(object obj, InputActionChange change)
+        {
+            // Track device when any action is performed
+            if (change == InputActionChange.ActionStarted)
+            {
+                var action = obj as InputAction;
+                if (action?.activeControl?.device != null)
+                {
+                    var device = action.activeControl.device;
+                    TrySetCurrentDevice(device);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Event Handlers - Priority 2 (Raw Input Events)
 
         private void OnInputEvent(InputEventPtr eventPtr, InputDevice device)
         {
             // Only process state events (actual input, not config changes)
             if (!eventPtr.IsA<StateEvent>() && !eventPtr.IsA<DeltaStateEvent>())
                 return;
-            
+
             // Only process button presses, not analog drift
-            // This prevents mouse movement or stick drift from triggering device switches
             if (!HasSignificantInput(eventPtr))
                 return;
-            
-            // Debounce to prevent spam during rapid device switching
-            if (Time.unscaledTime - _lastDeviceChangeTime < debounceTime)
-                return;
 
-            // Check if device actually changed
-            if (device != CurrentDevice)
-            {
-                if (device.name.Contains("Mouse") && CurrentDevice.name.Contains("Keyboard"))
-                    return;
-                SetCurrentDevice(device, silent: false);
-            }
+            TrySetCurrentDevice(device);
         }
 
         /// <summary>
         /// Checks if the event contains significant input (button press, not analog drift).
-        /// This prevents mouse movement or stick drift from triggering device switches.
         /// </summary>
         private bool HasSignificantInput(InputEventPtr eventPtr)
         {
-            // Check if ANY button was pressed (not just moved)
             foreach (var control in eventPtr.EnumerateChangedControls())
             {
-                if (control is ButtonControl button && button.isPressed)
+                if (control is UnityEngine.InputSystem.Controls.ButtonControl button && button.isPressed)
                 {
                     return true;
                 }
@@ -216,7 +275,7 @@ namespace HelloDev.Input
 
         #endregion
 
-        #region Event Handlers (Device Lifecycle)
+        #region Event Handlers - Priority 3 (Device Lifecycle)
 
         private void OnDeviceChange(InputDevice device, InputDeviceChange change)
         {
@@ -236,41 +295,29 @@ namespace HelloDev.Input
 
         private void OnDeviceAdded(InputDevice device)
         {
-            // If we don't have a current device, set this as current
             if (CurrentDevice == null)
             {
                 SetCurrentDevice(device, silent: false);
 
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input, 
+                    Logger.Log(LogSystems.Input,
                         $"Device added and set as current: {device.name}");
                 }
-            }
-            else if (enableDebugLogging)
-            {
-                Logger.Log(LogSystems.Input, 
-                    $"Device added: {device.name} (current device unchanged)");
             }
         }
 
         private void OnDeviceRemoved(InputDevice device)
         {
-            // If current device was removed, fallback to another
             if (device == CurrentDevice)
             {
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input, 
+                    Logger.Log(LogSystems.Input,
                         $"Current device removed: {device.name}. Finding fallback...");
                 }
 
                 FallbackToAvailableDevice();
-            }
-            else if (enableDebugLogging)
-            {
-                Logger.Log(LogSystems.Input, 
-                    $"Device removed: {device.name} (not current device)");
             }
         }
 
@@ -278,13 +325,40 @@ namespace HelloDev.Input
 
         #region Device Management
 
+        /// <summary>
+        /// Attempts to set the current device, with debouncing and device group filtering.
+        /// </summary>
+        private void TrySetCurrentDevice(InputDevice device)
+        {
+            if (device == null || !device.enabled)
+                return;
+
+            // Debounce to prevent spam
+            if (Time.unscaledTime - _lastDeviceChangeTime < debounceTime)
+                return;
+
+            // Check if device group actually changed (keyboard/mouse are same group)
+            var newGroup = GetDeviceGroup(device);
+            if (groupKeyboardMouse && newGroup == CurrentDeviceGroup)
+                return;
+
+            // Device changed - update
+            if (device != CurrentDevice)
+            {
+                SetCurrentDevice(device, silent: false);
+            }
+        }
+
+        /// <summary>
+        /// Sets the current device and fires change event.
+        /// </summary>
         private void SetCurrentDevice(InputDevice device, bool silent)
         {
-             if (device == null || !device.enabled)
+            if (device == null || !device.enabled)
             {
                 if (enableDebugLogging && device != null)
                 {
-                    Logger.LogWarning(LogSystems.Input, 
+                    Logger.LogWarning(LogSystems.Input,
                         $"Attempted to set disabled device: {device.name}");
                 }
                 return;
@@ -292,6 +366,7 @@ namespace HelloDev.Input
 
             var previousDevice = CurrentDevice;
             CurrentDevice = device;
+            CurrentDeviceGroup = GetDeviceGroup(device);
             _lastDeviceChangeTime = Time.unscaledTime;
 
             LogDeviceChange(previousDevice, device);
@@ -304,7 +379,6 @@ namespace HelloDev.Input
 
         private void FallbackToAvailableDevice()
         {
-            // Try to find any available device
             // Priority: Gamepad > Keyboard > Others
             var fallback = Gamepad.current
                         ?? (InputDevice)Keyboard.current
@@ -316,21 +390,35 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input, 
+                    Logger.Log(LogSystems.Input,
                         $"Fallback device selected: {fallback.name}");
                 }
             }
             else
             {
-                // No devices available
                 CurrentDevice = null;
+                CurrentDeviceGroup = null;
 
                 if (enableDebugLogging)
                 {
-                    Logger.LogWarning(LogSystems.Input, 
+                    Logger.LogWarning(LogSystems.Input,
                         "No fallback device available. CurrentDevice set to null.");
                 }
             }
+        }
+
+        /// <summary>
+        /// Gets the device group name for grouping (KeyboardMouse vs Gamepad).
+        /// </summary>
+        private string GetDeviceGroup(InputDevice device)
+        {
+            if (device is null)
+                return "KeyboardMouse";
+            if (device is Keyboard || device is Mouse)
+                return "KeyboardMouse";
+            if (device is Gamepad)
+                return "Gamepad";
+            return device.layout;
         }
 
         private void LogDeviceChange(InputDevice previous, InputDevice current)
@@ -338,7 +426,7 @@ namespace HelloDev.Input
             if (enableDebugLogging)
             {
                 Logger.Log(LogSystems.Input,
-                    $"Device switched: {previous?.name ?? "none"} → {current.name} ({current.layout})");
+                    $"Device switched: {previous?.name ?? "none"} ({GetDeviceGroup(previous)}) → {current.name} ({GetDeviceGroup(current)})");
             }
         }
 
@@ -349,10 +437,17 @@ namespace HelloDev.Input
         /// <summary>
         /// Manually set the current device (useful for testing or manual control).
         /// </summary>
-        /// <param name="device">The device to set as current</param>
         public void ForceSetDevice(InputDevice device)
         {
             SetCurrentDevice(device, silent: false);
+        }
+
+        /// <summary>
+        /// Checks if the given device is in the same group as the current device.
+        /// </summary>
+        public bool IsSameDeviceGroup(InputDevice device)
+        {
+            return GetDeviceGroup(device) == CurrentDeviceGroup;
         }
 
         #endregion

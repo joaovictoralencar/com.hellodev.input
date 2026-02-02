@@ -25,7 +25,7 @@ namespace HelloDev.Input
     /// </para>
     /// <para>
     /// <b>Device Tracking:</b> If <see cref="LastUsedDeviceTracker"/> is present in the scene,
-    /// this component automatically updates when the player switches between keyboard, mouse, and gamepad.
+    /// this component automatically updates when the player switches between keyboard/mouse and gamepad.
     /// </para>
     /// </remarks>
     public class InputPromptDisplay : MonoBehaviour
@@ -61,7 +61,7 @@ namespace HelloDev.Input
         [SerializeField] private bool preferIcon = true;
 
         [Tooltip("If true, hide icon when showing text and vice versa")]
-        [SerializeField] private bool exclusiveDisplay;
+        [SerializeField] private bool exclusiveDisplay = true;
 
         [Header("Events")]
         [Tooltip("Event fired when binding display updates. Use for custom icon handling.")]
@@ -78,7 +78,7 @@ namespace HelloDev.Input
 
         #region Private Fields
 
-        private bool _subscribedToDeviceTracker;
+        private DeviceTrackingHelper _deviceTracker;
         private string _cachedActionId;
         private int _cachedBindingIndex = -1;
 
@@ -209,55 +209,34 @@ namespace HelloDev.Input
                 InputSystem.onActionChange += OnActionChange;
 
             // Subscribe to device tracker for real-time device switching
-            SubscribeToDeviceTracker();
+            if (_deviceTracker == null)
+                _deviceTracker = new DeviceTrackingHelper(this, OnDeviceChanged);
+            
+            _deviceTracker.Subscribe();
 
             UpdateBindingDisplay();
         }
 
         protected void OnDisable()
         {
-            s_Instances.Remove(this);
-
-            if (s_Instances.Count == 0)
+            if (s_Instances != null)
             {
-                s_Instances = null;
-                InputSystem.onActionChange -= OnActionChange;
+                s_Instances.Remove(this);
+
+                if (s_Instances.Count == 0)
+                {
+                    s_Instances = null;
+                    InputSystem.onActionChange -= OnActionChange;
+                }
             }
 
             // Unsubscribe from device tracker
-            UnsubscribeFromDeviceTracker();
+            _deviceTracker?.Unsubscribe();
         }
 
         #endregion
 
-        #region Device Tracking (Options B + C)
-
-        private void SubscribeToDeviceTracker()
-        {
-            if (_subscribedToDeviceTracker)
-                return;
-
-            var tracker = LastUsedDeviceTracker.Instance;
-            if (tracker != null)
-            {
-                tracker.DeviceChanged += OnDeviceChanged;
-                _subscribedToDeviceTracker = true;
-            }
-        }
-
-        private void UnsubscribeFromDeviceTracker()
-        {
-            if (!_subscribedToDeviceTracker)
-                return;
-
-            var tracker = LastUsedDeviceTracker.Instance;
-            if (tracker != null)
-            {
-                tracker.DeviceChanged -= OnDeviceChanged;
-            }
-
-            _subscribedToDeviceTracker = false;
-        }
+        #region Device Tracking
 
         /// <summary>
         /// Called when the active input device changes.
@@ -265,6 +244,7 @@ namespace HelloDev.Input
         /// </summary>
         private void OnDeviceChanged(InputDevice previousDevice, InputDevice newDevice)
         {
+            InvalidateCache();
             UpdateBindingDisplay();
         }
 
@@ -307,15 +287,8 @@ namespace HelloDev.Input
                 }
                 else if (action.bindings.Count > 0)
                 {
-                    int defaultBindingIndex = 0;
-                    if (LastUsedDeviceTracker.Instance.CurrentDevice.name.Contains("Keyboard") || LastUsedDeviceTracker.Instance.CurrentDevice.name.Contains("Mouse"))
-                    {
-                        defaultBindingIndex = iconProvider.FallbackKeyboardIndex;
-                    } else if (LastUsedDeviceTracker.Instance.CurrentDevice.name.Contains("Gamepad"))
-                    {
-                        defaultBindingIndex = iconProvider.FallbackGamepadIndex;
-                    }
-                    // Fallback to first binding if bindingId not found
+                    // Fallback: use device-appropriate default binding
+                    int defaultBindingIndex = GetDefaultBindingIndex();
                     displayString = action.GetBindingDisplayString(
                         defaultBindingIndex,
                         out deviceLayoutName,
@@ -330,6 +303,31 @@ namespace HelloDev.Input
 
             // Fire event for custom handling
             updateBindingUIEvent?.Invoke(this, displayString, deviceLayoutName, controlPath);
+        }
+
+        /// <summary>
+        /// Gets the default binding index based on current device.
+        /// </summary>
+        private int GetDefaultBindingIndex()
+        {
+            if (iconProvider == null)
+                return 0;
+
+            var currentDevice = _deviceTracker?.GetCurrentDevice();
+            if (currentDevice == null)
+                return 0;
+
+            // Use appropriate fallback based on device type
+            if (currentDevice is Keyboard || currentDevice is Mouse)
+            {
+                return iconProvider.FallbackKeyboardIndex;
+            }
+            else if (currentDevice is Gamepad)
+            {
+                return iconProvider.FallbackGamepadIndex;
+            }
+
+            return 0;
         }
 
         private void UpdateBuiltInDisplay(string displayString, string deviceLayoutName, string controlPath)
@@ -398,7 +396,7 @@ namespace HelloDev.Input
                 bindingText.gameObject.SetActive(true);
             }
 
-            if (bindingIcon != null && exclusiveDisplay)
+            if (bindingIcon != null && exclusiveDisplay && !preferIcon)
             {
                 bindingIcon.gameObject.SetActive(false);
             }

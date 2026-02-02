@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0bf646f1a499a6469fb41169e1d75ec, type: 3}
+  m_Name: SO_IconMap_PS4IconMap
+  m_EditorClassIdentifier: 
+  deviceLayoutName: DualShock4GamepadHID
+  mappings:
+  - controlPath: buttonSouth
+    icon: {fileID: 461571114, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Cross
+  - controlPath: buttonEast
+    icon: {fileID: -390365173, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Circle
+  - controlPath: buttonWest
+    icon: {fileID: 1084292842, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Square
+  - controlPath: buttonNorth
+    icon: {fileID: -113176253, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Triangle
+  - controlPath: start
+    icon: {fileID: 1155122153, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Options
+  - controlPath: leftShoulder
+    icon: {fileID: -341555778, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: L1
+  - controlPath: rightShoulder
+    icon: {fileID: -861279469, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: R1
+  - controlPath: leftTrigger
+    icon: {fileID: 1053706052, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: L2
+  - controlPath: leftTriggerButton
+    icon: {fileID: 1053706052, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: L2
+  - controlPath: rightTrigger
+    icon: {fileID: 1326238866, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: R2
+  - controlPath: rightTriggerButton
+    icon: {fileID: 1326238866, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: R2
+  - controlPath: select
+    icon: {fileID: 2575959, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Select
+  - controlPath: leftStick
+    icon: {fileID: 1870678892, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: LS
+  - controlPath: rightStick
+    icon: {fileID: -701719954, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: RS
+  - controlPath: leftStickPress
+    icon: {fileID: 1629800253, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: L3
+  - controlPath: rightStickPress
+    icon: {fileID: 330330714, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: R3
+  - controlPath: dpad/up
+    icon: {fileID: 816383215, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Up
+  - controlPath: dpad/down
+    icon: {fileID: 1938816488, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Down
+  - controlPath: dpad/left
+    icon: {fileID: 1163955591, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Left
+  - controlPath: dpad/right
+    icon: {fileID: 324559572, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
+    fallbackText: Right

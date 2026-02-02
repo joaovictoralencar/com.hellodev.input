@@ -13,8 +13,10 @@ MonoBehaviour:
   m_Name: SO_InputIconProvider
   m_EditorClassIdentifier: HelloDev.Input::HelloDev.Input.InputIconProvider_SO
   iconMaps:
-  - {fileID: 11400000, guid: e3317eff5e51f4344b03d661821aee66, type: 2}
   - {fileID: 11400000, guid: 698c2705fdd4d0645ad702ab2b416137, type: 2}
   - {fileID: 11400000, guid: fd50347e3a720544cb62df6508a9678e, type: 2}
+  - {fileID: 11400000, guid: 092259e2227ed4a4cabe225a74687e42, type: 2}
+  - {fileID: 11400000, guid: e3317eff5e51f4344b03d661821aee66, type: 2}
   fallbackIconMap: {fileID: 11400000, guid: e3317eff5e51f4344b03d661821aee66, type: 2}
+  fallbackKeyboardIndex: 0
   fallbackGamepadIndex: 1
