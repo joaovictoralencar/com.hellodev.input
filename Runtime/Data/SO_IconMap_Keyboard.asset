@@ -32,7 +32,7 @@ MonoBehaviour:
   - controlPath: tab
     icon: {fileID: 17416562, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Tab
-  - controlPath: leftShift
+  - controlPath: shift
     icon: {fileID: -2120801154, guid: 069a00c4a21d8654bbe27600f3ba7103, type: 3}
     fallbackText: Shift
   - controlPath: leftCtrl
