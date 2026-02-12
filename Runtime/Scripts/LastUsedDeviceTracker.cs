@@ -94,6 +94,9 @@ namespace HelloDev.Input
         #endregion
 
         #region Configuration
+        
+        [Tooltip("If true, it will invoke DontDestroyOnLoad")]
+        [SerializeField] private bool persistent = true;
 
         [Header("Tracking Options")]
         [Tooltip("Track device via action performs (Priority 1 - recommended)")]
@@ -140,7 +143,7 @@ namespace HelloDev.Input
             }
 
             _instance = this;
-            DontDestroyOnLoad(gameObject);
+            if (persistent) DontDestroyOnLoad(gameObject);
 
             // Initialize with first available device
             InitializeCurrentDevice();
