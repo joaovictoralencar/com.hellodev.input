@@ -2,8 +2,6 @@
     "name": "HelloDev.Input",
     "rootNamespace": "HelloDev.Input",
     "references": [
-        "Unity.InputSystem",
-        "Unity.TextMeshPro",
         "HelloDev.QuestSystem.Tutorials",
         "HelloDev.UI.Default",
         "HelloDev.Utils"

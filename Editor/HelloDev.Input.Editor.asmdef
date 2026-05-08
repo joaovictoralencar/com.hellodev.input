@@ -2,8 +2,7 @@
     "name": "HelloDev.Input.Editor",
     "rootNamespace": "HelloDev.Input.Editor",
     "references": [
-        "HelloDev.Input",
-        "Unity.InputSystem"
+        "HelloDev.Input"
     ],
     "includePlatforms": [
         "Editor"

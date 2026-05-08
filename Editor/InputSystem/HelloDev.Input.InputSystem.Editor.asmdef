@@ -1,0 +1,19 @@
+{
+  "name": "HelloDev.Input.InputSystem.Editor",
+  "rootNamespace": "HelloDev.Input.InputSystem.Editor",
+  "references": [
+    "HelloDev.Input.InputSystem",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
