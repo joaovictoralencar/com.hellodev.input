@@ -1,6 +1,6 @@
 {
   "name": "com.hellodev.input",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "displayName": "HelloDev Input",
   "description": "Input display, device tracking, and rebinding utilities for Unity Input System",
   "unity": "2022.3",

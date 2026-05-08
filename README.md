@@ -523,3 +523,9 @@ public class CustomIconHandler : MonoBehaviour
 ## License
 
 MIT License
+
+## Installation
+Install via Unity Package Manager (Git URL):
+https://github.com/joaovictoralencar/com.hellodev.input.git#v1.0.3
+
+This release updates docs and packaging.
