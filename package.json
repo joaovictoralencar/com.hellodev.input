@@ -1,12 +1,14 @@
 {
   "name": "com.hellodev.input",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "HelloDev Input",
   "description": "Input display, device tracking, and rebinding utilities for Unity Input System",
   "unity": "2022.3",
   "dependencies": {
     "com.unity.inputsystem": "1.7.0",
-    "com.unity.textmeshpro": "3.0.6"
+    "com.unity.textmeshpro": "3.0.6",
+    "com.hellodev.utils": "https://github.com/joaovictoralencar/hellodev-utils.git#v1.0.1",
+    "com.hellodev.ui": "https://github.com/joaovictoralencar/hellodev-ui.git#v1.0.5"
   },
   "keywords": [
     "input",
