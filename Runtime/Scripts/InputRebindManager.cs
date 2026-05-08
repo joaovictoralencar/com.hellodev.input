@@ -163,7 +163,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.LogWarning(LogSystems.InputRebind, "Cannot save: no InputActionAsset assigned");
+                    Logger.LogWarning("InputRebind", "Cannot save: no InputActionAsset assigned");
                 }
                 return;
             }
@@ -175,7 +175,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Bindings saved to PlayerPrefs key: {playerPrefsKey}");
+                Logger.Log("InputRebind", $"Bindings saved to PlayerPrefs key: {playerPrefsKey}");
             }
 
             OnBindingsSaved?.Invoke();
@@ -191,7 +191,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.LogWarning(LogSystems.InputRebind, "Cannot load: no InputActionAsset assigned");
+                    Logger.LogWarning("InputRebind", "Cannot load: no InputActionAsset assigned");
                 }
                 return;
             }
@@ -203,7 +203,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.InputRebind, "No saved bindings found");
+                    Logger.Log("InputRebind", "No saved bindings found");
                 }
                 return;
             }
@@ -212,7 +212,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Bindings loaded from PlayerPrefs key: {playerPrefsKey}");
+                Logger.Log("InputRebind", $"Bindings loaded from PlayerPrefs key: {playerPrefsKey}");
             }
 
             OnBindingsLoaded?.Invoke();
@@ -229,7 +229,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, "Saved bindings cleared");
+                Logger.Log("InputRebind", "Saved bindings cleared");
             }
         }
 
@@ -247,7 +247,7 @@ namespace HelloDev.Input
 #if ENABLE_INPUT_SYSTEM
             if (actionReference == null || actionReference.action == null)
             {
-                Logger.LogWarning(LogSystems.InputRebind,"Cannot rebind: action reference is null");
+                Logger.LogWarning("InputRebind","Cannot rebind: action reference is null");
                 return;
             }
 
@@ -261,7 +261,7 @@ namespace HelloDev.Input
 
             if (bindingIndex < 0 || bindingIndex >= action.bindings.Count)
             {
-                Logger.LogWarning(LogSystems.InputRebind, $"Invalid binding index {bindingIndex} for action {action.name}");
+                Logger.LogWarning("InputRebind", $"Invalid binding index {bindingIndex} for action {action.name}");
                 return;
             }
 
@@ -317,7 +317,7 @@ namespace HelloDev.Input
 
                     if (enableDebugLogging)
                     {
-                        Logger.Log(LogSystems.InputRebind, $"Rebind canceled for {action.name}");
+                        Logger.Log("InputRebind", $"Rebind canceled for {action.name}");
                     }
                 })
                 .OnComplete(operation =>
@@ -328,7 +328,7 @@ namespace HelloDev.Input
                     if (enableDebugLogging)
                     {
                         var binding = action.bindings[bindingIndex];
-                        Logger.Log(LogSystems.InputRebind, $"Rebind completed for {action.name}: {binding.effectivePath}");
+                        Logger.Log("InputRebind", $"Rebind completed for {action.name}: {binding.effectivePath}");
                     }
 
                     // If rebinding composite, continue to next part
@@ -364,7 +364,7 @@ namespace HelloDev.Input
             {
                 var binding = action.bindings[bindingIndex];
                 var partName = binding.isPartOfComposite ? $" (part: {binding.name})" : "";
-                Logger.Log(LogSystems.InputRebind, $"Rebind started for {action.name}{partName}");
+                Logger.Log("InputRebind", $"Rebind started for {action.name}{partName}");
             }
         }
 
@@ -445,7 +445,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Reset bindings for {action.name}");
+                Logger.Log("InputRebind", $"Reset bindings for {action.name}");
             }
 #endif
         }
@@ -464,7 +464,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, "All bindings reset to default");
+                Logger.Log("InputRebind", "All bindings reset to default");
             }
 #endif
         }
@@ -533,7 +533,7 @@ namespace HelloDev.Input
         {
             if (string.IsNullOrEmpty(actionName))
             {
-                Logger.LogWarning(LogSystems.InputRebind, "Cannot create runtime action: actionName is null or empty");
+                Logger.LogWarning("InputRebind", "Cannot create runtime action: actionName is null or empty");
                 return null;
             }
 
@@ -542,7 +542,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.InputRebind, $"Runtime action '{actionName}' already exists, returning existing action");
+                    Logger.Log("InputRebind", $"Runtime action '{actionName}' already exists, returning existing action");
                 }
                 return existingAction;
             }
@@ -575,7 +575,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Created runtime action '{actionName}' with bindings: keyboard='{keyboardBinding}', gamepad='{gamepadBinding}'");
+                Logger.Log("InputRebind", $"Created runtime action '{actionName}' with bindings: keyboard='{keyboardBinding}', gamepad='{gamepadBinding}'");
             }
 
             return action;
@@ -592,7 +592,7 @@ namespace HelloDev.Input
         {
             if (string.IsNullOrEmpty(actionName))
             {
-                Logger.LogWarning(LogSystems.InputRebind, "Cannot create runtime action: actionName is null or empty");
+                Logger.LogWarning("InputRebind", "Cannot create runtime action: actionName is null or empty");
                 return null;
             }
 
@@ -601,7 +601,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.InputRebind, $"Runtime action '{actionName}' already exists, returning existing action");
+                    Logger.Log("InputRebind", $"Runtime action '{actionName}' already exists, returning existing action");
                 }
                 return existingAction;
             }
@@ -626,7 +626,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Created runtime action '{actionName}' with binding: '{binding}'");
+                Logger.Log("InputRebind", $"Created runtime action '{actionName}' with binding: '{binding}'");
             }
 
             return action;
@@ -681,7 +681,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Disposed runtime action '{actionName}'");
+                Logger.Log("InputRebind", $"Disposed runtime action '{actionName}'");
             }
 
             return true;
@@ -707,7 +707,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.InputRebind, $"Disposed {count} runtime action(s)");
+                Logger.Log("InputRebind", $"Disposed {count} runtime action(s)");
             }
         }
 #else

@@ -135,7 +135,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.LogWarning(LogSystems.Input,
+                    Logger.LogWarning("Input",
                         "Multiple LastUsedDeviceTracker instances detected. Destroying duplicate.", this);
                 }
                 Destroy(gameObject);
@@ -153,7 +153,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input, "LastUsedDeviceTracker initialized and ready.");
+                Logger.Log("Input", "LastUsedDeviceTracker initialized and ready.");
             }
         }
 
@@ -179,7 +179,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input,
+                Logger.Log("Input",
                     $"LastUsedDeviceTracker enabled. Tracking: Actions={trackViaActions}, RawInput={trackViaRawInput}, Lifecycle={monitorDeviceLifecycle}");
             }
         }
@@ -221,7 +221,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input,
+                Logger.Log("Input",
                     $"Initialized with device: {CurrentDevice?.name ?? "none"} (Group: {CurrentDeviceGroup})");
             }
         }
@@ -304,7 +304,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input,
+                    Logger.Log("Input",
                         $"Device added and set as current: {device.name}");
                 }
             }
@@ -316,7 +316,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input,
+                    Logger.Log("Input",
                         $"Current device removed: {device.name}. Finding fallback...");
                 }
 
@@ -361,7 +361,7 @@ namespace HelloDev.Input
             {
                 if (enableDebugLogging && device != null)
                 {
-                    Logger.LogWarning(LogSystems.Input,
+                    Logger.LogWarning("Input",
                         $"Attempted to set disabled device: {device.name}");
                 }
                 return;
@@ -393,7 +393,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input,
+                    Logger.Log("Input",
                         $"Fallback device selected: {fallback.name}");
                 }
             }
@@ -404,7 +404,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logger.LogWarning(LogSystems.Input,
+                    Logger.LogWarning("Input",
                         "No fallback device available. CurrentDevice set to null.");
                 }
             }
@@ -428,7 +428,7 @@ namespace HelloDev.Input
         {
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input,
+                Logger.Log("Input",
                     $"Device switched: {previous?.name ?? "none"} ({GetDeviceGroup(previous)}) → {current.name} ({GetDeviceGroup(current)})");
             }
         }

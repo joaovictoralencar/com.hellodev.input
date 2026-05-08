@@ -138,7 +138,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input, $"Subscribed to action '{actionReference.action.name}' (enabled: {actionReference.action.enabled})");
+                    Logger.Log("Input", $"Subscribed to action '{actionReference.action.name}' (enabled: {actionReference.action.enabled})");
                 }
             }
         }
@@ -156,7 +156,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logger.Log(LogSystems.Input, $"Unsubscribed from action '{actionReference.action.name}'");
+                    Logger.Log("Input", $"Unsubscribed from action '{actionReference.action.name}'");
                 }
             }
         }
@@ -171,7 +171,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.Log(LogSystems.Input, $" Action '{actionReference.action.name}' performed", this);
+                Logger.Log("Input", $" Action '{actionReference.action.name}' performed", this);
             }
 
             onActionPerformed?.Invoke();
@@ -226,7 +226,7 @@ namespace HelloDev.Input
             var manager = InputRebindManager.Instance;
             if (manager == null)
             {
-                Logger.LogWarning(LogSystems.Input, "Cannot rebind: InputRebindManager not found");
+                Logger.LogWarning("Input", "Cannot rebind: InputRebindManager not found");
                 return;
             }
 
@@ -243,7 +243,7 @@ namespace HelloDev.Input
             var manager = InputRebindManager.Instance;
             if (manager == null)
             {
-                Logger.LogWarning(LogSystems.Input, "Cannot reset: InputRebindManager not found");
+                Logger.LogWarning("Input", "Cannot reset: InputRebindManager not found");
                 return;
             }
 

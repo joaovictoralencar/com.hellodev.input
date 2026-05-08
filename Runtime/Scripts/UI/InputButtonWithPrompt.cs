@@ -195,7 +195,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logging.Logger.LogVerbose(LogSystems.Input, $"Found children - " +
+                Logging.Logger.LogVerbose("Input", $"Found children - " +
                                                 $"InputActionButton: {(inputActionButton != null ? "Yes" : "No")}, " +
                                                 $"InputPromptDisplay: {(inputPromptDisplay != null ? "Yes" : "No")}", this);
             }
@@ -213,7 +213,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logging.Logger.LogVerbose(LogSystems.Input,$"Synced ActionReference to InputActionButton: {(actionReference != null ? actionReference.action?.name : "null")}", this);
+                    Logging.Logger.LogVerbose("Input",$"Synced ActionReference to InputActionButton: {(actionReference != null ? actionReference.action?.name : "null")}", this);
                 }
             }
 
@@ -230,7 +230,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logging.Logger.LogVerbose(LogSystems.Input,$"Synced to InputPromptDisplay. Action={actionReference?.action?.name}, BindingId={bindingId}", this);
+                    Logging.Logger.LogVerbose("Input",$"Synced to InputPromptDisplay. Action={actionReference?.action?.name}, BindingId={bindingId}", this);
                 }
             }
 
@@ -250,7 +250,7 @@ namespace HelloDev.Input
 
                 if (enableDebugLogging)
                 {
-                    Logging.Logger.LogVerbose(LogSystems.Input,"Subscribed to InputActionButton.OnActionPerformed", this);
+                    Logging.Logger.LogVerbose("Input","Subscribed to InputActionButton.OnActionPerformed", this);
                 }
             }
         }
@@ -272,7 +272,7 @@ namespace HelloDev.Input
         {
             if (enableDebugLogging)
             {
-                Logging.Logger.LogVerbose(LogSystems.Input,"Forwarding OnActionPerformed from child", this);
+                Logging.Logger.LogVerbose("Input","Forwarding OnActionPerformed from child", this);
             }
 
             onActionPerformed?.Invoke();
@@ -292,7 +292,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.LogVerbose(LogSystems.Input, "Subscribed to InputPromptDisplay.OnUpdateBindingUI", this);
+                Logger.LogVerbose("Input", "Subscribed to InputPromptDisplay.OnUpdateBindingUI", this);
             }
         }
 
@@ -335,7 +335,7 @@ namespace HelloDev.Input
 
             if (enableDebugLogging)
             {
-                Logger.LogVerbose(LogSystems.Input, $"Updated button label: {displayText}", this);
+                Logger.LogVerbose("Input", $"Updated button label: {displayText}", this);
             }
         }
 
