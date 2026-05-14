@@ -3,6 +3,7 @@
   "rootNamespace": "HelloDev.Input.InputSystem",
   "references": [
     "HelloDev.Input",
+    "HelloDev.Utils",
     "Unity.InputSystem",
     "Unity.TextMeshPro"
   ],
