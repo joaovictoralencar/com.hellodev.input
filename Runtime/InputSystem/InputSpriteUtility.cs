@@ -57,9 +57,21 @@ namespace HelloDev.Input
 
                 // Find the action by name in enabled action maps
                 var action = FindActionInEnabledMaps(actionName);
+
+                // If action not found, try to resolve the tag directly via iconProvider (treat tag as control path)
                 if (action == null)
                 {
-                    // Action not found - keep original tag
+                    var directIconMap = iconProvider.GetIconMapForLayout(deviceLayout);
+                    if (directIconMap != null)
+                    {
+                        var (directIcon, directText) = directIconMap.GetBinding(actionName);
+                        if (directIcon != null)
+                            return $"<sprite name=\"{directIcon.name}\">";
+                        if (!string.IsNullOrEmpty(directText))
+                            return directText;
+                    }
+
+                    // Action not found and no direct mapping - keep original tag
                     return match.Value;
                 }
 
@@ -83,8 +95,19 @@ namespace HelloDev.Input
 
                 if (string.IsNullOrEmpty(controlPath))
                 {
-                    // No binding found for this device - keep original tag
-                    return deviceLayout.Contains("Gamepad") ? "Gamepad" : "Keyboard";
+                    // No binding found for this device — try direct icon mapping using the action name as a control path
+                    var directIconMap = iconProvider.GetIconMapForLayout(deviceLayout);
+                    if (directIconMap != null)
+                    {
+                        var (directIcon, directText) = directIconMap.GetBinding(actionName);
+                        if (directIcon != null)
+                            return $"<sprite name=\"{directIcon.name}\">";
+                        if (!string.IsNullOrEmpty(directText))
+                            return directText;
+                    }
+
+                    // Fallback: keep original sprite tag
+                    return match.Value;
                 }
 
                 // Get the device-specific icon from the icon provider
