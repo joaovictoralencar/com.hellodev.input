@@ -7,7 +7,7 @@
   "unityRelease": "0f1",
   "dependencies": {
     "com.unity.inputsystem": "1.7.0",
-    "com.unity.textmeshpro": "3.0.6",
+    "com.unity.ugui": "1.0.0",
     "com.hellodev.utils": "https://github.com/joaovictoralencar/hellodev-utils.git#v1.0.7",
     "com.hellodev.ui": "https://github.com/joaovictoralencar/hellodev-ui.git#v2.0.0"
   },
