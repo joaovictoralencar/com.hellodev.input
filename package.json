@@ -1,6 +1,6 @@
 {
   "name": "com.hellodev.input",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "displayName": "HelloDev Input",
   "description": "Input display, device tracking, and rebinding utilities for Unity Input System",
   "unity": "6000.0",
@@ -8,8 +8,8 @@
   "dependencies": {
     "com.unity.inputsystem": "1.7.0",
     "com.unity.ugui": "1.0.0",
-    "com.hellodev.utils": "https://github.com/joaovictoralencar/hellodev-utils.git#v1.0.7",
-    "com.hellodev.ui": "https://github.com/joaovictoralencar/hellodev-ui.git#v2.0.0"
+    "com.hellodev.utils": "1.1.1",
+    "com.hellodev.ui": "2.2.2"
   },
   "keywords": [
     "input",
@@ -20,9 +20,7 @@
   ],
   "author": {
     "name": "HelloDev",
-    "email": "hello@hellodev.com",
-    "url": ""
+    "email": "hello@hellodev.com"
   },
-  "license": "MIT",
-  "type": "library"
+  "license": "MIT"
 }
